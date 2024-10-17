@@ -2,33 +2,33 @@
 
 import axios from 'axios';
 
-// Replace with your actual OpenRouteService API key
-const OPEN_ROUTE_SERVICE_API_KEY = '5b3ce3597851110001cf624822d6989b68c840939e6bce6b32bc6f15';
+// Replace with your actual Mapbox Access Token
+const MAPBOX_ACCESS_TOKEN = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 'sk.eyJ1IjoiYWthc2hrdW1hcjc5MDIiLCJhIjoiY20yZGFiNXYzMWI3dzJqcjI2NzRrcmF5ZyJ9.8d1Ub4RFmIJStFo2XYLlcg';
 
-// Base URL for OpenRouteService Directions API
-const DIRECTIONS_URL = 'https://api.openrouteservice.org/v2/directions/driving-car';
+// Base URL for Mapbox Directions API
+const DIRECTIONS_URL = 'https://api.mapbox.com/directions/v5/mapbox/driving';
 
 const getRoute = async (start, end) => {
   try {
-    const response = await axios.post(
-      DIRECTIONS_URL,
-      {
-        coordinates: [
-          [start.longitude, start.latitude],
-          [end.longitude, end.latitude],
-        ],
+    const coordinates = `${start.longitude},${start.latitude};${end.longitude},${end.latitude}`;
+    const response = await axios.get(`${DIRECTIONS_URL}/${coordinates}`, {
+      params: {
+        alternatives: false,
+        geometries: 'geojson',
+        steps: false,
+        access_token: MAPBOX_ACCESS_TOKEN,
       },
-      {
-        headers: {
-          'Authorization': OPEN_ROUTE_SERVICE_API_KEY,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    });
 
     // Extract the route geometry
-    const geometry = response.data.features[0].geometry;
-    return geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert to [lat, lng]
+    const route = response.data.routes[0];
+    const geometry = route.geometry;
+
+    // Mapbox provides coordinates in [longitude, latitude] format
+    // Convert them to [latitude, longitude] for Leaflet
+    const routeCoordinates = geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+    return routeCoordinates;
   } catch (error) {
     console.error('Error fetching route:', error);
     return null;

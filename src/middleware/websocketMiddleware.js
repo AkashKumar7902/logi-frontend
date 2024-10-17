@@ -24,6 +24,7 @@ const websocketMiddleware = (storeAPI) => {
         });
 
         socket.addEventListener('message', (event) => {
+          console.log('WebSocket message:', event.data);
           const data = JSON.parse(event.data);
           storeAPI.dispatch(receiveMessage(data));
         });
