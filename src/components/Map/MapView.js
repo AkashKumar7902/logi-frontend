@@ -175,7 +175,8 @@ const MapView = ({
       {role === "driver" &&
         (bookingStatus === "Driver Assigned" ||
           bookingStatus === "En Route to Pickup" ||
-          bookingStatus === "Pending") &&
+          bookingStatus === "Pending" ||
+          bookingStatus === "Completed") &&
         pickupLocation && (
           <Marker
             position={[
@@ -191,7 +192,8 @@ const MapView = ({
       {role === "driver" &&
         (bookingStatus === "Goods Collected" ||
           bookingStatus === "In Transit" ||
-          bookingStatus === "Pending") &&
+          bookingStatus === "Pending" ||
+          bookingStatus === "Completed") &&
         dropoffLocation && (
           <Marker
             position={[
@@ -207,7 +209,8 @@ const MapView = ({
       {role === "user" &&
         (bookingStatus === "Driver Assigned" ||
           bookingStatus === "En Route to Pickup" ||
-          bookingStatus === "Pending") &&
+          bookingStatus === "Pending" ||
+          bookingStatus === "Completed") &&
         pickupLocation && (
           <Marker
             position={[pickupLocation.latitude, pickupLocation.longitude]}
@@ -220,7 +223,8 @@ const MapView = ({
       {role === "user" &&
         (bookingStatus === "Goods Collected" ||
           bookingStatus === "In Transit" ||
-          bookingStatus === "Pending") &&
+          bookingStatus === "Pending" ||
+          bookingStatus === "Completed") &&
         dropoffLocation && (
           <Marker
             position={[dropoffLocation.latitude, dropoffLocation.longitude]}
@@ -235,7 +239,7 @@ const MapView = ({
       )}
 
       {/* Adjust map bounds only once */}
-      <FitBounds bounds={bounds} bookingStatus={bookingStatus}/>
+      <FitBounds bounds={bounds} bookingStatus={bookingStatus} />
     </MapContainer>
   );
 };
