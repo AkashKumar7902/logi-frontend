@@ -1,5 +1,6 @@
 // src/services/routingService.js
 
+import {LocalConvenienceStoreOutlined} from '@mui/icons-material';
 import axios from 'axios';
 
 // Replace with your actual Mapbox Access Token
@@ -9,6 +10,7 @@ const MAPBOX_ACCESS_TOKEN = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 'sk.eyJ
 const DIRECTIONS_URL = 'https://api.mapbox.com/directions/v5/mapbox/driving';
 
 const getRoute = async (start, end) => {
+    console.log(start, end);
   try {
     const coordinates = `${start.longitude},${start.latitude};${end.longitude},${end.latitude}`;
     const response = await axios.get(`${DIRECTIONS_URL}/${coordinates}`, {

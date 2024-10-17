@@ -17,8 +17,8 @@ const UserDashboard = () => {
   const [driverDetails, setDriverDetails] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
-  const [dropoffLocation, setDropoffLocation] = useState(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [formData, setFormData] = useState({
     pickupLatitude: "",
     pickupLongitude: "",
@@ -28,7 +28,6 @@ const UserDashboard = () => {
     scheduledTime: "",
   });
   const [priceEstimate, setPriceEstimate] = useState(null);
-  const [bookingStatus, setBookingStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pickup, setPickup] = useState(null);
@@ -41,41 +40,85 @@ const UserDashboard = () => {
     // eslint-disable-next-line
   }, []);
 
+  useEffect(() => {
+    if (activeBooking) {
+      if (activeBooking.status === "Pending") {
+        fetchRoute(
+          {
+            latitude: activeBooking.pickup_location.coordinates[0],
+            longitude: activeBooking.pickup_location.coordinates[1],
+          },
+          {
+            latitude: activeBooking.dropoff_location.coordinates[0],
+            longitude: activeBooking.dropoff_location.coordinates[1],
+          }
+        );
+      }
+      if (driverLocation) {
+        if (
+          activeBooking.status === "Driver Assigned" ||
+          activeBooking.status === "En Route to Pickup"
+        ) {
+          fetchRoute(
+            {
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+            },
+            {
+              latitude: activeBooking.pickup_location.coordinates[0],
+              longitude: activeBooking.pickup_location.coordinates[1],
+            }
+          );
+        } else if (
+          activeBooking.status === "In Transit" ||
+          activeBooking.status === "Goods Collected"
+        ) {
+          fetchRoute(
+            {
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+            },
+            {
+              latitude: activeBooking.dropoff_location.coordinates[0],
+              longitude: activeBooking.dropoff_location.coordinates[1],
+            }
+          );
+        }
+      }
+    }
+  }, [driverLocation, activeBooking]);
+
   // Listen to WebSocket messages
   useEffect(() => {
     if (messages.length === 0) return;
 
     messages.forEach((msg) => {
+      if (msg.type === "booking_accepted") {
+        if (msg.payload.booking_id === activeBooking?.id) {
+          toast.info("Booking Accepted");
+          fetchDriverDetails(activeBooking.id);
+        }
+      }
       if (msg.type === "status_update") {
-        if (msg.booking_id === activeBooking?.id) {
-          setBookingStatus(msg.status);
-          toast.info(`Booking Status Updated: ${msg.status}`);
-          if (msg.status === "In Transit") {
-            // Update drop-off location if necessary
-            setDropoffLocation(activeBooking.dropoff_location);
-            // Route from driver to drop-off
-            fetchRoute(driverLocation, activeBooking.dropoff_location);
+        if (msg.payload.booking_id === activeBooking?.id) {
+          toast.info(`Booking Status Updated: ${msg.payload.status}`);
+          if (msg.payload.status === "Completed") {
+            setActiveBooking(null);
+            setDriverDetails(null);
+            setRouteCoordinates([]);
+            setDriverLocation(null);
+          } else {
+            setActiveBooking({ ...activeBooking, status: msg.payload.status });
           }
         }
       }
       if (msg.type === "driver_location") {
-        if (msg.booking_id === activeBooking?.id) {
+        console.log("Driver Location:", msg); 
+        if (msg.payload.booking_id === activeBooking?.id) {
           setDriverLocation({
-            latitude: msg.latitude,
-            longitude: msg.longitude,
+            latitude: msg.payload.latitude,
+            longitude: msg.payload.longitude,
           });
-          // Update route based on booking status
-          if (bookingStatus === "Driver Assigned") {
-            fetchRoute(userLocation, {
-              latitude: msg.latitude,
-              longitude: msg.longitude,
-            });
-          } else if (bookingStatus === "In Transit") {
-            fetchRoute(
-              { latitude: msg.latitude, longitude: msg.longitude },
-              dropoffLocation
-            );
-          }
         }
       }
     });
@@ -91,22 +134,7 @@ const UserDashboard = () => {
       console.log(response.data);
       if (response.data) {
         setActiveBooking(response.data);
-        fetchDriverDetails(response.data.driver_id);
-        setBookingStatus(response.data.status);
-        setDropoffLocation({
-          latitude: response.data.dropoff_location?.coordinates[1],
-          longitude: response.data.dropoff_location?.coordinates[0],
-        });
-        // Fetch route based on booking status
-        if (
-          response.data.status === "Driver Assigned" ||
-          response.data.status === "En Route to Pickup"
-        ) {
-          fetchRoute(userLocation, {
-            latitude: response.data.driver_location.coordinates[1],
-            longitude: response.data.driver_location.coordinates[0],
-          });
-        }
+        fetchDriverDetails(response.data.id);
       }
     } catch (error) {
       console.error("Error fetching active booking:", error);
@@ -117,11 +145,16 @@ const UserDashboard = () => {
     }
   };
 
-  const fetchDriverDetails = async (driverId) => {
+  const fetchDriverDetails = async (bookingId) => {
     try {
-      const response = await api.get(`/drivers/${driverId}`);
+      const response = await api.get(`/bookings/${bookingId}/driver`);
       if (response.data) {
+        console.log("driver details", response.data);
         setDriverDetails(response.data);
+        setDriverLocation({
+          latitude: response.data.location?.coordinates[0],
+          longitude: response.data.location?.coordinates[1],
+        });
       }
     } catch (error) {
       console.error("Error fetching driver details:", error);
@@ -134,38 +167,10 @@ const UserDashboard = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          console.log("position ", position);
           setUserLocation({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
-          // If there's an active booking, fetch the route
-          if (activeBooking) {
-            if (
-              activeBooking.status === "Driver Assigned" ||
-              activeBooking.status === "En Route to Pickup"
-            ) {
-              fetchRoute(position.coords, {
-                latitude: activeBooking.driver_location.coordinates[0],
-                longitude: activeBooking.driver_location.coordinates[1],
-              });
-            }
-            if (
-              activeBooking.status === "Goods Collected" ||
-              activeBooking.status === "In Transit"
-            ) {
-              fetchRoute(
-                {
-                  latitude: activeBooking.driver_location.coordinates[0],
-                  longitude: activeBooking.driver_location.coordinates[1],
-                },
-                {
-                  latitude: activeBooking.dropoff_location.coordinates[0],
-                  longitude: activeBooking.dropoff_location.coordinates[1],
-                }
-              );
-            }
-          }
         },
         (error) => {
           console.error("Error getting user location:", error);
@@ -221,24 +226,8 @@ const UserDashboard = () => {
 
       const response = await api.post("/bookings", bookingRequest);
       if (response.data) {
+        console.log("booking created", response.data);
         setActiveBooking(response.data);
-        fetchDriverDetails(response.data.driver_id);
-        setBookingStatus(response.data.status);
-        setDriverLocation({
-          latitude: response.data.driver_location?.coordinates[1],
-          longitude: response.data.driver_location?.coordinates[0],
-        });
-        setDropoffLocation({
-          latitude: response.data.dropoff_location?.coordinates[1],
-          longitude: response.data.dropoff_location?.coordinates[0],
-        });
-        // Fetch route based on booking status
-        if (response.data.status === "Driver Assigned") {
-          fetchRoute(userLocation, {
-            latitude: response.data.driver_location.coordinates[1],
-            longitude: response.data.driver_location.coordinates[0],
-          });
-        }
         setShowBookingForm(false);
         toast.success("Booking created successfully.");
       }
@@ -288,6 +277,7 @@ const UserDashboard = () => {
   };
 
   const fetchRoute = async (start, end) => {
+    console.log("Fetching route..."); 
     if (!start || !end) return;
     const startCoords = {
       latitude: parseFloat(start.latitude),
@@ -299,10 +289,12 @@ const UserDashboard = () => {
     };
     const route = await routingService.getRoute(startCoords, endCoords);
     if (route) {
-      // The MapView component will fetch the route based on props
-      // This function can be omitted if MapView handles route fetching internally
-    } else {
-      toast.error("Failed to fetch route.");
+      if (route) {
+        setRouteCoordinates(route);
+      } else {
+        setRouteCoordinates([]);
+        toast.error("Failed to fetch route.");
+      }
     }
   };
 
@@ -331,155 +323,152 @@ const UserDashboard = () => {
       {/* Left Column */}
       <div className="md:w-1/3 bg-gray-100 p-6 overflow-auto">
         {loading && <p className="text-blue-500">Loading...</p>}
-        {
-          /* {activeBooking ? ( */ false ? (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Active Booking</h2>
-              <div className="mb-4">
-                <h3 className="text-xl font-semibold">Booking Details</h3>
+        {activeBooking ? (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Active Booking</h2>
+            <div className="mb-4">
+              <h3 className="text-xl font-semibold">Booking Details</h3>
+              <p>
+                <strong>Pickup Location:</strong> Latitude:{" "}
+                {activeBooking.pickup_location.coordinates[0]}, Longitude:{" "}
+                {activeBooking.pickup_location.coordinates[1]}
+              </p>
+              <p>
+                <strong>Drop-off Location:</strong> Latitude:{" "}
+                {activeBooking.dropoff_location.coordinates[0]}, Longitude:{" "}
+                {activeBooking.dropoff_location.coordinates[1]}
+              </p>
+              <p>
+                <strong>Vehicle Type:</strong> {activeBooking.vehicle_type}
+              </p>
+              <p>
+                <strong>Price Estimate:</strong> ₹{activeBooking.price_estimate}
+              </p>
+              <p>
+                <strong>Status:</strong> {activeBooking.status}
+              </p>
+            </div>
+            {driverDetails && (
+              <div>
+                <h3 className="text-xl font-semibold">Driver Details</h3>
                 <p>
-                  <strong>Pickup Location:</strong> Latitude:{" "}
-                  {activeBooking.pickup_location.coordinates[1]}, Longitude:{" "}
-                  {activeBooking.pickup_location.coordinates[0]}
+                  <strong>Name:</strong> {driverDetails.name}
                 </p>
                 <p>
-                  <strong>Drop-off Location:</strong> Latitude:{" "}
-                  {activeBooking.dropoff_location.coordinates[1]}, Longitude:{" "}
-                  {activeBooking.dropoff_location.coordinates[0]}
+                  <strong>Email:</strong> {driverDetails.email}
                 </p>
                 <p>
-                  <strong>Vehicle Type:</strong> {activeBooking.vehicle_type}
+                  <strong>Vehicle ID:</strong> {driverDetails.vehicle_id}
                 </p>
                 <p>
-                  <strong>Price Estimate:</strong> ₹
-                  {activeBooking.price_estimate}
-                </p>
-                <p>
-                  <strong>Status:</strong> {bookingStatus}
+                  <strong>Status:</strong> {driverDetails.status}
                 </p>
               </div>
-              {driverDetails && (
+            )}
+          </div>
+        ) : showBookingForm ? (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Create a New Booking</h2>
+            {error && <p className="text-red-500 mb-2">{error}</p>}
+            <form onSubmit={handleBookingSubmit} className="space-y-4">
+              {/* Autocomplete Search for Pickup Location */}
+              <AutocompleteSearch
+                label="Pickup"
+                onSelect={handlePickupSelect}
+              />
+
+              {/* Autocomplete Search for Drop-off Location */}
+              <AutocompleteSearch
+                label="Drop-off"
+                onSelect={handleDropoffSelect}
+              />
+
+              {/* Vehicle Type Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Vehicle Type
+                </label>
+                <select
+                  name="vehicleType"
+                  value={formData.vehicleType}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                >
+                  <option value="bike">Bike</option>
+                  <option value="car">Car</option>
+                  <option value="van">Van</option>
+                </select>
+              </div>
+
+              {/* Scheduled Time (Optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Scheduled Time (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  name="scheduledTime"
+                  value={formData.scheduledTime}
+                  onChange={handleInputChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                />
+              </div>
+
+              {/* Price Estimate */}
+              {priceEstimate && (
                 <div>
-                  <h3 className="text-xl font-semibold">Driver Details</h3>
-                  <p>
-                    <strong>Name:</strong> {driverDetails.name}
-                  </p>
-                  <p>
-                    <strong>Email:</strong> {driverDetails.email}
-                  </p>
-                  <p>
-                    <strong>Vehicle ID:</strong> {driverDetails.vehicle_id}
-                  </p>
-                  <p>
-                    <strong>Status:</strong> {driverDetails.status}
+                  <p className="text-green-600">
+                    <strong>Price Estimate:</strong> ₹{priceEstimate}
                   </p>
                 </div>
               )}
-            </div>
-          ) : showBookingForm ? (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Create a New Booking</h2>
-              {error && <p className="text-red-500 mb-2">{error}</p>}
-              <form onSubmit={handleBookingSubmit} className="space-y-4">
-                {/* Autocomplete Search for Pickup Location */}
-                <AutocompleteSearch
-                  label="Pickup"
-                  onSelect={handlePickupSelect}
-                />
 
-                {/* Autocomplete Search for Drop-off Location */}
-                <AutocompleteSearch
-                  label="Drop-off"
-                  onSelect={handleDropoffSelect}
-                />
-
-                {/* Vehicle Type Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Vehicle Type
-                  </label>
-                  <select
-                    name="vehicleType"
-                    value={formData.vehicleType}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                  >
-                    <option value="bike">Bike</option>
-                    <option value="car">Car</option>
-                    <option value="van">Van</option>
-                  </select>
-                </div>
-
-                {/* Scheduled Time (Optional) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Scheduled Time (Optional)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    name="scheduledTime"
-                    value={formData.scheduledTime}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                  />
-                </div>
-
-                {/* Price Estimate */}
-                {priceEstimate && (
-                  <div>
-                    <p className="text-green-600">
-                      <strong>Price Estimate:</strong> ₹{priceEstimate}
-                    </p>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex space-x-2">
-                  <button
-                    type="button"
-                    onClick={handlePriceEstimate}
-                    disabled={loading}
-                    className={`bg-blue-500 text-white px-4 py-2 rounded-md ${
-                      loading ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loading ? "Calculating..." : "Get Price Estimate"}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className={`bg-green-500 text-white px-4 py-2 rounded-md ${
-                      loading ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loading ? "Booking..." : "Book Now"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBookingForm(false)}
-                    disabled={loading}
-                    className={`bg-gray-500 text-white px-4 py-2 rounded-md ${
-                      loading ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Welcome to Logi</h2>
-              <button
-                onClick={() => setShowBookingForm(true)}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md"
-              >
-                Create a New Booking
-              </button>
-            </div>
-          )
-        }
+              {/* Action Buttons */}
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={handlePriceEstimate}
+                  disabled={loading}
+                  className={`bg-blue-500 text-white px-4 py-2 rounded-md ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? "Calculating..." : "Get Price Estimate"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`bg-green-500 text-white px-4 py-2 rounded-md ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? "Booking..." : "Book Now"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBookingForm(false)}
+                  disabled={loading}
+                  className={`bg-gray-500 text-white px-4 py-2 rounded-md ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Welcome to Logi</h2>
+            <button
+              onClick={() => setShowBookingForm(true)}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md"
+            >
+              Create a New Booking
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right Column */}
@@ -491,13 +480,21 @@ const UserDashboard = () => {
           pickupLocation={
             activeBooking
               ? {
-                  latitude: activeBooking.pickup_location.coordinates[1],
-                  longitude: activeBooking.pickup_location.coordinates[0],
+                  latitude: activeBooking.pickup_location.coordinates[0],
+                  longitude: activeBooking.pickup_location.coordinates[1],
                 }
               : null
           }
-          dropoffLocation={dropoffLocation}
-          bookingStatus={bookingStatus}
+          dropoffLocation={
+            activeBooking
+              ? {
+                  latitude: activeBooking.dropoff_location.coordinates[0],
+                  longitude: activeBooking.dropoff_location.coordinates[1],
+                }
+              : null
+          }
+          bookingStatus={activeBooking?.status}
+          routeCoordinates={routeCoordinates}
         />
       </div>
     </div>

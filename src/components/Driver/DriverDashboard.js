@@ -48,17 +48,36 @@ const DriverDashboard = () => {
 
   useEffect(() => {
     if (bookingDetails) {
+      console.log(bookingDetails);
+      if (bookingDetails.status === "Pending") {
+        fetchRoute(
+          {
+            latitude: bookingDetails.pickup_location.coordinates[0],
+            longitude: bookingDetails.pickup_location.coordinates[1],
+          },
+          {
+            latitude: bookingDetails.dropoff_location.coordinates[0],
+            longitude: bookingDetails.dropoff_location.coordinates[1],
+          }
+        );
+      }
       if (
         bookingDetails.status === "Driver Assigned" ||
         bookingDetails.status === "En Route to Pickup"
       ) {
-        fetchRoute(driverLocation, bookingDetails.pickup_location);
+        fetchRoute(driverLocation, {
+          latitude: bookingDetails.pickup_location.coordinates[0],
+          longitude: bookingDetails.pickup_location.coordinates[1],
+        });
       }
       if (
         bookingDetails.status === "In Transit" ||
         bookingDetails.status === "Goods Collected"
       ) {
-        fetchRoute(driverLocation, bookingDetails.dropoff_location);
+        fetchRoute(driverLocation, {
+          latitude: bookingDetails.dropoff_location.coordinates[0],
+          longitude: bookingDetails.dropoff_location.coordinates[1],
+        });
       }
     }
   }, [driverLocation, bookingDetails]);
@@ -290,8 +309,8 @@ const DriverDashboard = () => {
       longitude: parseFloat(start.longitude),
     };
     const endCoords = {
-      latitude: parseFloat(end.coordinates[0]),
-      longitude: parseFloat(end.coordinates[1]),
+      latitude: parseFloat(end.latitude),
+      longitude: parseFloat(end.longitude),
     };
     const route = await routingService.getRoute(startCoords, endCoords);
     if (route) {
