@@ -15,7 +15,6 @@ const DriverDashboard = () => {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.websocket.messages);
   const [isOnline, setIsOnline] = useState(false); // Initially Offline
-  const [currentBooking, setCurrentBooking] = useState(null);
   const [bookingDetails, setBookingDetails] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
@@ -30,7 +29,7 @@ const DriverDashboard = () => {
     if (messages.length === 0) return;
 
     messages.forEach((msg) => {
-      if (msg.type === "new_booking_request" && isOnline && !currentBooking) {
+      if (msg.type === "new_booking_request" && isOnline && !bookingDetails) {
         console.log("New booking request received:", msg.payload);
         // New booking request received
         handleNewBookingRequest(msg.payload);
@@ -40,7 +39,7 @@ const DriverDashboard = () => {
     // Clear messages after processing to prevent duplicate handling
     dispatch(clearMessages());
     // eslint-disable-next-line
-  }, [messages, isOnline, currentBooking]);
+  }, [messages, isOnline, bookingDetails]);
 
   // Check for active bookings on component mount
   useEffect(() => {
@@ -195,7 +194,6 @@ const DriverDashboard = () => {
       const res = await api.get("/drivers/active-bookings");
       console.log("active booking", res.data);
       if (res.data) {
-        setCurrentBooking(res.data);
         fetchBookingDetails(res.data[0].id, posi);
       }
     } catch (err) {
@@ -221,7 +219,6 @@ const DriverDashboard = () => {
 
   // Handle new booking request
   const handleNewBookingRequest = async (booking) => {
-    setCurrentBooking({ id: booking.id });
     setBookingDetails(booking);
     toast.info("New booking request received.");
 
@@ -256,7 +253,6 @@ const DriverDashboard = () => {
         response: "reject",
       });
       toast.warn("Booking rejected.");
-      setCurrentBooking(null);
       setBookingDetails(null);
     } catch (err) {
       console.error("Error rejecting booking:", err);
@@ -266,20 +262,19 @@ const DriverDashboard = () => {
 
   // Change booking status (e.g., Picked Up, Completed)
   const handleChangeBookingStatus = async (newStatus) => {
-    if (!currentBooking) return;
     try {
       await api.post(`/drivers/booking-status`, {
-        booking_id: currentBooking[0].id,
+        booking_id: bookingDetails.id,
         status: newStatus,
       });
       toast.success(`Booking status updated to ${newStatus}.`);
-      // Fetch updated booking details
-      fetchBookingDetails(currentBooking[0].id);
       // If status is 'Completed', clear booking
       if (newStatus === "Completed") {
-        setCurrentBooking(null);
         setBookingDetails(null);
         setRouteCoordinates([]);
+      } else {
+        // Fetch updated booking details
+        fetchBookingDetails(bookingDetails.id);
       }
     } catch (err) {
       console.error("Error updating booking status:", err);
@@ -322,103 +317,99 @@ const DriverDashboard = () => {
         {/* Conditional Rendering Based on Booking Status */}
         {loading ? (
           <p className="text-blue-500">Loading...</p>
-        ) : currentBooking ? (
-          bookingDetails ? (
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Current Booking</h3>
-              <p>
-                <strong>Pickup Location:</strong>{" "}
-                {bookingDetails
-                  ? `Lat: ${bookingDetails.pickup_location.coordinates[0]}, Lng: ${bookingDetails.pickup_location.coordinates[1]}`
-                  : "N/A"}
-              </p>
-              <p>
-                <strong>Drop-off Location:</strong>{" "}
-                {bookingDetails
-                  ? `Lat: ${bookingDetails.dropoff_location.coordinates[0]}, Lng: ${bookingDetails.dropoff_location.coordinates[1]}`
-                  : "N/A"}
-              </p>
-              <p>
-                <strong>Vehicle Type:</strong> {bookingDetails.vehicle_type}
-              </p>
-              <p>
-                <strong>Status:</strong> {bookingDetails.status}
-              </p>
+        ) : bookingDetails ? (
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Current Booking</h3>
+            <p>
+              <strong>Pickup Location:</strong>{" "}
+              {bookingDetails
+                ? `Lat: ${bookingDetails.pickup_location.coordinates[0]}, Lng: ${bookingDetails.pickup_location.coordinates[1]}`
+                : "N/A"}
+            </p>
+            <p>
+              <strong>Drop-off Location:</strong>{" "}
+              {bookingDetails
+                ? `Lat: ${bookingDetails.dropoff_location.coordinates[0]}, Lng: ${bookingDetails.dropoff_location.coordinates[1]}`
+                : "N/A"}
+            </p>
+            <p>
+              <strong>Vehicle Type:</strong> {bookingDetails.vehicle_type}
+            </p>
+            <p>
+              <strong>Status:</strong> {bookingDetails.status}
+            </p>
 
-              {/* If booking is pending, show Accept and Reject buttons */}
-              {bookingDetails.status === "Pending" && (
-                <div className="mt-4 flex space-x-2">
-                  <button
-                    onClick={() => handleAcceptBooking(currentBooking.id)}
-                    className="bg-green-500 text-white px-4 py-2 rounded-md"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleRejectBooking(currentBooking.id)}
-                    className="bg-red-500 text-white px-4 py-2 rounded-md"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
+            {/* If booking is pending, show Accept and Reject buttons */}
+            {bookingDetails.status === "Pending" && (
+              <div className="mt-4 flex space-x-2">
+                <button
+                  onClick={() => handleAcceptBooking(bookingDetails?.id)}
+                  className="bg-green-500 text-white px-4 py-2 rounded-md"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => handleRejectBooking(bookingDetails?.id)}
+                  className="bg-red-500 text-white px-4 py-2 rounded-md"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
 
-              {/* If booking is accepted or in transit, show status update options */}
-              {bookingDetails.status !== "Pending" && (
-                <div className="mt-4">
-                  <h4 className="text-lg font-medium">Update Booking Status</h4>
-                  <div className="mt-2 flex space-x-2">
-                    {bookingDetails.status === "Driver Assigned" && (
-                      <button
-                        onClick={() =>
-                          handleChangeBookingStatus("En Route to Pickup")
-                        }
-                        className="bg-green-500 text-white px-4 py-2 rounded-md"
-                      >
-                        En Route to Pickup
-                      </button>
-                    )}
-                    {bookingDetails.status === "En Route to Pickup" && (
-                      <button
-                        onClick={() =>
-                          handleChangeBookingStatus("Goods Collected")
-                        }
-                        className="bg-green-500 text-white px-4 py-2 rounded-md"
-                      >
-                        Goods Collected
-                      </button>
-                    )}
-                    {bookingDetails.status === "Goods Collected" && (
-                      <button
-                        onClick={() => handleChangeBookingStatus("In Transit")}
-                        className="bg-green-500 text-white px-4 py-2 rounded-md"
-                      >
-                        In Transit
-                      </button>
-                    )}
-                    {bookingDetails.status === "In Transit" && (
-                      <button
-                        onClick={() => handleChangeBookingStatus("Delivered")}
-                        className="bg-green-500 text-white px-4 py-2 rounded-md"
-                      >
-                        Delivered
-                      </button>
-                    )}
-                    {bookingDetails.status === "Delivered" && (
-                      <button
-                        onClick={() => handleChangeBookingStatus("Completed")}
-                        className="bg-green-500 text-white px-4 py-2 rounded-md"
-                      >
-                        Completed
-                      </button>
-                    )}
-                  </div>
+            {/* If booking is accepted or in transit, show status update options */}
+            {bookingDetails.status !== "Pending" && (
+              <div className="mt-4">
+                <h4 className="text-lg font-medium">Update Booking Status</h4>
+                <div className="mt-2 flex space-x-2">
+                  {bookingDetails.status === "Driver Assigned" && (
+                    <button
+                      onClick={() =>
+                        handleChangeBookingStatus("En Route to Pickup")
+                      }
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      En Route to Pickup
+                    </button>
+                  )}
+                  {bookingDetails.status === "En Route to Pickup" && (
+                    <button
+                      onClick={() =>
+                        handleChangeBookingStatus("Goods Collected")
+                      }
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Goods Collected
+                    </button>
+                  )}
+                  {bookingDetails.status === "Goods Collected" && (
+                    <button
+                      onClick={() => handleChangeBookingStatus("In Transit")}
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      In Transit
+                    </button>
+                  )}
+                  {bookingDetails.status === "In Transit" && (
+                    <button
+                      onClick={() => handleChangeBookingStatus("Delivered")}
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Delivered
+                    </button>
+                  )}
+                  {bookingDetails.status === "Delivered" && (
+                    <button
+                      onClick={() => handleChangeBookingStatus("Completed")}
+                      className="bg-green-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Completed
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <p>Loading booking details...</p>
-          )
+              </div>
+            )}
+          </div>
         ) : (
           isOnline && (
             <div>
