@@ -1,0 +1,38 @@
+/* src/components/Map/AutocompleteSearch.css */
+
+.autocomplete-search {
+    position: relative;
+  }
+  
+  .react-autosuggest__container {
+    position: relative;
+  }
+  
+  .react-autosuggest__input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  
+  .react-autosuggest__suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .react-autosuggest__suggestion {
+    padding: 8px;
+    cursor: pointer;
+  }
+  
+  .react-autosuggest__suggestion--highlighted {
+    background-color: #ddd;
+  }
+  
