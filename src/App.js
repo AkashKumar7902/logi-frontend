@@ -18,7 +18,7 @@ import useWebSocket from './hooks/useWebSocket';
 function App() {
   const { authToken, isAuthenticated, userRole } = useAuth();
 
-  const wsUrl = 'ws://localhost:8080/ws?token=' + authToken; // Replace with dynamic token as needed
+  const wsUrl = 'ws://logi-y295.onrender.com/ws?token=' + authToken; // Replace with dynamic token as needed
   const isConnected = useWebSocket(wsUrl);
 
   return (
