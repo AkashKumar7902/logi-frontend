@@ -1,0 +1,43 @@
+/* src/components/Admin/AdminDashboard.css */
+
+.admin-dashboard-container {
+    background-color: #f1f5f9;
+  }
+  
+  .admin-dashboard-container .bg-gray-800 {
+    background-color: #2d3748;
+  }
+  
+  .admin-dashboard-container .text-white {
+    color: #fff;
+  }
+  
+  .admin-dashboard-container .text-gray-700 {
+    color: #4a5568;
+  }
+  
+  .admin-dashboard-container table {
+    border-collapse: collapse;
+  }
+  
+  .admin-dashboard-container th,
+  .admin-dashboard-container td {
+    text-align: left;
+  }
+  
+  .admin-dashboard-container th {
+    background-color: #edf2f7;
+  }
+  
+  .admin-dashboard-container tr:nth-child(even) {
+    background-color: #f7fafc;
+  }
+  
+  .admin-dashboard-container button {
+    transition: background-color 0.3s ease;
+  }
+  
+  .admin-dashboard-container button:hover {
+    opacity: 0.8;
+  }
+  
