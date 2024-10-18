@@ -45,6 +45,8 @@ const MapView = ({
   driverLocation,
   pickupLocation,
   dropoffLocation,
+  pickupName,
+  dropoffName,
   bookingStatus,
   routeCoordinates,
 }) => {
@@ -184,7 +186,7 @@ const MapView = ({
               pickupLocation.coordinates[1],
             ]}
           >
-            <Popup>Pickup Location</Popup>
+            <Popup>Pickup Location: {pickupName || "Loading..."}</Popup>
           </Marker>
         )}
 
@@ -201,7 +203,7 @@ const MapView = ({
               dropoffLocation.coordinates[1],
             ]}
           >
-            <Popup>Drop-off Location</Popup>
+            <Popup>Drop-off Location: {dropoffName || "Loading..."}</Popup>
           </Marker>
         )}
 
@@ -229,7 +231,7 @@ const MapView = ({
           <Marker
             position={[dropoffLocation.latitude, dropoffLocation.longitude]}
           >
-            <Popup>Drop-off Location</Popup>
+            <Popup>Drop-off Location: {dropoffName || "Loading..."}</Popup>
           </Marker>
         )}
 

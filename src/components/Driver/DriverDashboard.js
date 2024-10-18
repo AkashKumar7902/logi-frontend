@@ -7,6 +7,7 @@ import MapView from "../Map/MapView";
 import AvailabilitySwitch from "../shared/AvailabilitySwitch";
 import { clearMessages, receiveMessage } from "../../slices/websocketSlice";
 import routingService from "../../services/routingService";
+import geocodingService from "../../services/geoCodingService"; // Import geocoding service
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./DriverDashboard.css"; // Optional: For custom styling
@@ -20,6 +21,10 @@ const DriverDashboard = () => {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // New state variables for place names
+  const [pickupName, setPickupName] = useState("");
+  const [dropoffName, setDropoffName] = useState("");
 
   const bookingTimeoutRef = useRef(null);
   const locationIntervalRef = useRef(null);
@@ -49,6 +54,28 @@ const DriverDashboard = () => {
   useEffect(() => {
     if (bookingDetails) {
       console.log(bookingDetails);
+      // Fetch place names
+      const fetchPlaceNames = async () => {
+        const pickupLat = bookingDetails.pickup_location.coordinates[0];
+        const pickupLng = bookingDetails.pickup_location.coordinates[1];
+        const dropoffLat = bookingDetails.dropoff_location.coordinates[0];
+        const dropoffLng = bookingDetails.dropoff_location.coordinates[1];
+
+        const fetchedPickupName = await geocodingService.getPlaceName(
+          pickupLat,
+          pickupLng
+        );
+        const fetchedDropoffName = await geocodingService.getPlaceName(
+          dropoffLat,
+          dropoffLng
+        );
+
+        setPickupName(fetchedPickupName);
+        setDropoffName(fetchedDropoffName);
+      };
+
+      fetchPlaceNames();
+
       if (bookingDetails.status === "Pending") {
         fetchRoute(
           {
@@ -241,6 +268,24 @@ const DriverDashboard = () => {
     setBookingDetails(booking);
     toast.info("New booking request received.");
 
+    // Fetch place names for the new booking
+    const pickupLat = booking.pickup_location.coordinates[0];
+    const pickupLng = booking.pickup_location.coordinates[1];
+    const dropoffLat = booking.dropoff_location.coordinates[0];
+    const dropoffLng = booking.dropoff_location.coordinates[1];
+
+    const fetchedPickupName = await geocodingService.getPlaceName(
+      pickupLat,
+      pickupLng
+    );
+    const fetchedDropoffName = await geocodingService.getPlaceName(
+      dropoffLat,
+      dropoffLng
+    );
+
+    setPickupName(fetchedPickupName);
+    setDropoffName(fetchedDropoffName);
+
     // Start 1-minute timeout to auto-reject
     bookingTimeoutRef.current = setTimeout(() => {
       handleRejectBooking(booking.id);
@@ -273,6 +318,8 @@ const DriverDashboard = () => {
       });
       toast.warn("Booking rejected.");
       setBookingDetails(null);
+      setPickupName("");
+      setDropoffName("");
     } catch (err) {
       console.error("Error rejecting booking:", err);
       toast.error("Failed to reject booking.");
@@ -291,6 +338,8 @@ const DriverDashboard = () => {
       if (newStatus === "Completed") {
         setBookingDetails(null);
         setRouteCoordinates([]);
+        setPickupName("");
+        setDropoffName("");
       } else {
         // Fetch updated booking details
         fetchBookingDetails(bookingDetails.id);
@@ -340,22 +389,19 @@ const DriverDashboard = () => {
           <div>
             <h3 className="text-xl font-semibold mb-2">Current Booking</h3>
             <p>
-              <strong>Pickup Location:</strong>{" "}
-              {bookingDetails
-                ? `Lat: ${bookingDetails.pickup_location.coordinates[0]}, Lng: ${bookingDetails.pickup_location.coordinates[1]}`
-                : "N/A"}
+              <strong>Pickup Location:</strong> {pickupName || "Loading..."}
             </p>
             <p>
-              <strong>Drop-off Location:</strong>{" "}
-              {bookingDetails
-                ? `Lat: ${bookingDetails.dropoff_location.coordinates[0]}, Lng: ${bookingDetails.dropoff_location.coordinates[1]}`
-                : "N/A"}
+              <strong>Drop-off Location:</strong> {dropoffName || "Loading..."}
             </p>
             <p>
               <strong>Vehicle Type:</strong> {bookingDetails.vehicle_type}
             </p>
             <p>
               <strong>Status:</strong> {bookingDetails.status}
+            </p>
+            <p>
+              <strong>Fare:</strong> ₹{bookingDetails.price_estimate}
             </p>
 
             {/* If booking is pending, show Accept and Reject buttons */}
@@ -453,6 +499,8 @@ const DriverDashboard = () => {
           dropoffLocation={
             bookingDetails ? bookingDetails.dropoff_location : null
           }
+          pickupName={pickupName} // Pass place name
+          dropoffName={dropoffName} // Pass place name
           bookingStatus={bookingDetails ? bookingDetails.status : null}
           routeCoordinates={routeCoordinates}
         />
