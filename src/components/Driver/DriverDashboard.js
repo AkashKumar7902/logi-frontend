@@ -11,12 +11,14 @@ import geocodingService from "../../services/geoCodingService"; // Import geocod
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./DriverDashboard.css"; // Optional: For custom styling
+import { FaCheck, FaTimes } from "react-icons/fa";
 
 const DriverDashboard = () => {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.websocket.messages);
   const [isOnline, setIsOnline] = useState(false); // Initially Offline
-  const [bookingDetails, setBookingDetails] = useState(null);
+  const [bookingRequests, setBookingRequests] = useState([]); // Multiple booking requests
+  const [bookingDetails, setBookingDetails] = useState(null); // Selected booking
   const [driverLocation, setDriverLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,12 +36,16 @@ const DriverDashboard = () => {
     if (messages.length === 0) return;
 
     messages.forEach((msg) => {
-      if (msg.type === "new_booking_request" && isOnline && !bookingDetails) {
+      if (msg.type === "new_booking_request" && isOnline) {
         console.log("New booking request received:", msg.payload);
         // New booking request received
         handleNewBookingRequest(msg.payload);
       }
       // Handle other message types if needed
+      if (msg.type === "driver_status_update") {
+        // Example: Update driver status if needed
+        // Implement as per your backend specifications
+      }
     });
     // Clear messages after processing to prevent duplicate handling
     dispatch(clearMessages());
@@ -49,6 +55,7 @@ const DriverDashboard = () => {
   // Check for active bookings on component mount
   useEffect(() => {
     checkActiveBooking();
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
@@ -109,6 +116,47 @@ const DriverDashboard = () => {
     }
   }, [driverLocation, bookingDetails]);
 
+  // add pickupname and dropoffname to booking requests
+  useEffect(() => {
+    // check if dropoffName and pickupName are already present
+    var alreadyPresentInAll = true;
+    bookingRequests.forEach((booking) => {
+      if (!booking.pickupName || !booking.dropoffName) {
+        alreadyPresentInAll = false;
+      }
+    });
+    if (bookingRequests.length > 0 && !alreadyPresentInAll) {
+      bookingRequests.forEach(async (booking) => {
+        const pickupLat = booking.pickup_location.coordinates[0];
+        const pickupLng = booking.pickup_location.coordinates[1];
+        const dropoffLat = booking.dropoff_location.coordinates[0];
+        const dropoffLng = booking.dropoff_location.coordinates[1];
+
+        const fetchedPickupName = await geocodingService.getPlaceName(
+          pickupLat,
+          pickupLng
+        );
+        const fetchedDropoffName = await geocodingService.getPlaceName(
+          dropoffLat,
+          dropoffLng
+        );
+
+        setBookingRequests((prev) => {
+          return prev.map((b) => {
+            if (b.id === booking.id) {
+              return {
+                ...b,
+                pickupName: fetchedPickupName,
+                dropoffName: fetchedDropoffName,
+              };
+            }
+            return b;
+          });
+        });
+      });
+    }
+  }, [bookingRequests]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -140,7 +188,7 @@ const DriverDashboard = () => {
       stopSendingLocation();
       // Optionally, notify backend about availability
       try {
-        await api.post("/drivers/status", { status: "offline" });
+        await api.post("/drivers/status", { status: "Offline" });
         toast.info("You are now Offline.");
       } catch (err) {
         console.error(err);
@@ -212,7 +260,7 @@ const DriverDashboard = () => {
   // Check for active booking
   const checkActiveBooking = async () => {
     setLoading(true);
-    var posi = null;
+    let posi = null;
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -239,8 +287,8 @@ const DriverDashboard = () => {
     try {
       const res = await api.get("/drivers/active-bookings");
       console.log("active booking", res.data);
-      if (res.data) {
-        fetchBookingDetails(res.data[0].id, posi);
+      if (res.data && res.data.length > 0) {
+        setBookingDetails(res.data[0]);
       }
     } catch (err) {
       console.error("No active booking found.");
@@ -251,7 +299,7 @@ const DriverDashboard = () => {
   };
 
   // Fetch booking details
-  const fetchBookingDetails = async (bookingId, driverLocation) => {
+  const fetchBookingDetails = async (bookingId) => {
     try {
       const res = await api.get(`/drivers/bookings/${bookingId}`);
       if (res.data) {
@@ -265,7 +313,7 @@ const DriverDashboard = () => {
 
   // Handle new booking request
   const handleNewBookingRequest = async (booking) => {
-    setBookingDetails(booking);
+    setBookingRequests((prev) => [...prev, booking]);
     toast.info("New booking request received.");
 
     // Fetch place names for the new booking
@@ -283,13 +331,22 @@ const DriverDashboard = () => {
       dropoffLng
     );
 
-    setPickupName(fetchedPickupName);
-    setDropoffName(fetchedDropoffName);
+    // Update booking details if it's the first booking
+    setBookingDetails((prev) => {
+      if (!prev) {
+        return {
+          ...booking,
+          pickupName: fetchedPickupName,
+          dropoffName: fetchedDropoffName,
+        };
+      }
+      return prev;
+    });
 
-    // Start 1-minute timeout to auto-reject
-    bookingTimeoutRef.current = setTimeout(() => {
-      handleRejectBooking(booking.id);
-    }, 60000); // 60,000 ms = 1 minute
+    // // Start 1-minute timeout to auto-reject
+    // bookingTimeoutRef.current = setTimeout(() => {
+    //   handleRejectBooking(booking.id);
+    // }, 60000); // 60,000 ms = 1 minute
   };
 
   // Accept booking
@@ -301,8 +358,10 @@ const DriverDashboard = () => {
       });
       toast.success("Booking accepted.");
       clearTimeout(bookingTimeoutRef.current);
-      // Fetch updated booking details
-      fetchBookingDetails(bookingId);
+      // Set the accepted booking as the current booking
+      const acceptedBooking = bookingRequests.find((b) => b.id === bookingId);
+      setBookingDetails(acceptedBooking);
+      setBookingRequests([]);
     } catch (err) {
       console.error("Error accepting booking:", err);
       toast.error("Failed to accept booking.");
@@ -317,9 +376,13 @@ const DriverDashboard = () => {
         response: "reject",
       });
       toast.warn("Booking rejected.");
-      setBookingDetails(null);
-      setPickupName("");
-      setDropoffName("");
+      // Remove the rejected booking from bookingRequests
+      setBookingRequests((prev) => prev.filter((b) => b.id !== bookingId));
+      // If the rejected booking was the selected booking, select the next one
+      if (bookingDetails && bookingDetails.id === bookingId) {
+        const nextBooking = bookingRequests.find((b) => b.id !== bookingId);
+        setBookingDetails(nextBooking || null);
+      }
     } catch (err) {
       console.error("Error rejecting booking:", err);
       toast.error("Failed to reject booking.");
@@ -340,6 +403,11 @@ const DriverDashboard = () => {
         setRouteCoordinates([]);
         setPickupName("");
         setDropoffName("");
+        // Optionally, fetch next booking
+        if (bookingRequests.length > 0) {
+          const nextBooking = bookingRequests[0];
+          setBookingDetails(nextBooking);
+        }
       } else {
         // Fetch updated booking details
         fetchBookingDetails(bookingDetails.id);
@@ -370,10 +438,12 @@ const DriverDashboard = () => {
     }
   };
 
+  console.log(bookingRequests);
+
   return (
     <div className="flex flex-col md:flex-row h-screen">
       <ToastContainer />
-      {/* Left Column */}
+      {/* Left Column - Booking Requests */}
       <div className="md:w-1/3 bg-gray-100 p-6 overflow-auto">
         <h2 className="text-2xl font-bold mb-4">Driver Dashboard</h2>
         {/* Availability Switch */}
@@ -382,11 +452,59 @@ const DriverDashboard = () => {
           handleToggle={handleToggleAvailability}
         />
 
-        {/* Conditional Rendering Based on Booking Status */}
-        {loading ? (
-          <p className="text-blue-500">Loading...</p>
+        {/* Booking Requests List */}
+        {bookingRequests.length !== 0 ? (
+          <div className="mt-6">
+            <ul>
+              {bookingRequests.map((booking) => (
+                <li
+                  key={booking.id}
+                  className={`flex justify-between items-center p-2 mb-2 rounded cursor-pointer ${
+                    bookingDetails && bookingDetails.id === booking.id
+                      ? "bg-blue-100"
+                      : "bg-white hover:bg-blue-50"
+                  }`}
+                  onClick={() => setBookingDetails(booking)}
+                >
+                  <div>
+                    <p>
+                      <strong>Pickup:</strong> {booking?.pickupName || "Loading..."}
+                    </p>
+                    <p>
+                      <strong>Drop-off:</strong> {booking?.dropoffName || "Loading..."}
+                    </p>
+                    <p>
+                      <strong>Fare:</strong> {booking.price_estimate}
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAcceptBooking(booking.id);
+                      }}
+                      className="bg-green-500 text-white px-2 py-1 rounded"
+                      title="Accept Booking"
+                    >
+                      <FaCheck />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRejectBooking(booking.id);
+                      }}
+                      className="bg-red-500 text-white px-2 py-1 rounded"
+                      title="Reject Booking"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : bookingDetails ? (
-          <div>
+          <div className="mt-6 bg-white p-4 shadow rounded">
             <h3 className="text-xl font-semibold mb-2">Current Booking</h3>
             <p>
               <strong>Pickup Location:</strong> {pickupName || "Loading..."}
@@ -404,26 +522,7 @@ const DriverDashboard = () => {
               <strong>Fare:</strong> ₹{bookingDetails.price_estimate}
             </p>
 
-            {/* If booking is pending, show Accept and Reject buttons */}
-            {bookingDetails.status === "Pending" && (
-              <div className="mt-4 flex space-x-2">
-                <button
-                  onClick={() => handleAcceptBooking(bookingDetails?.id)}
-                  className="bg-green-500 text-white px-4 py-2 rounded-md"
-                >
-                  Accept
-                </button>
-                <button
-                  onClick={() => handleRejectBooking(bookingDetails?.id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded-md"
-                >
-                  Reject
-                </button>
-              </div>
-            )}
-
             {/* If booking is accepted or in transit, show status update options */}
-            {bookingDetails.status !== "Pending" && (
               <div className="mt-4">
                 <h4 className="text-lg font-medium">Update Booking Status</h4>
                 <div className="mt-2 flex space-x-2">
@@ -473,21 +572,23 @@ const DriverDashboard = () => {
                   )}
                 </div>
               </div>
-            )}
           </div>
         ) : (
-          isOnline && (
-            <div>
-              <h3 className="text-xl font-semibold mb-2">
-                Waiting for Booking Request
-              </h3>
-              <p>Your status is Online. Waiting for booking requests...</p>
-            </div>
-          )
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold mb-2">Booking Requests</h3>
+            {isOnline ? (
+              <p>No booking requests available. Looking for new requests.</p>
+            ) : (
+              <p>
+                {" "}
+                Please switch to online, to start getting booking requests{" "}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Right Column */}
+      {/* Right Column - Map View */}
       <div className="md:w-2/3 h-full">
         <MapView
           role="driver"
