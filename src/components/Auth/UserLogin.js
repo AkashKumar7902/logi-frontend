@@ -58,7 +58,7 @@ function UserLogin() {
         </div>
 
         <div className="button-group">
-          <button type="submit">Register</button>
+          <button type="submit">Login</button>
         </div>
       </form>
     </div>

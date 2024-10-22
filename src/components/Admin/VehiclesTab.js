@@ -12,10 +12,10 @@ const VehiclesTab = () => {
   const [newVehicle, setNewVehicle] = useState({
     make: '',
     model: '',
-    year: '',
-    licensePlate: '',
-    vehicleType: '',
-    driverID: '',
+    year: 0,
+    license_plate: '',
+    vehicle_type: '',
+    driver_id: '',
   });
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -38,21 +38,36 @@ const VehiclesTab = () => {
   };
 
   const handleInputChange = (e) => {
-    setNewVehicle({ ...newVehicle, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setNewVehicle({ ...newVehicle, [name]: value });
   };
 
   const handleAddVehicle = async (e) => {
     e.preventDefault();
+
+    // Convert 'year' to a number
+    const vehicleToSubmit = {
+      ...newVehicle,
+      year: Number(newVehicle.year),
+    };
+
+    // Validate 'year'
+    if (isNaN(vehicleToSubmit.year) || vehicleToSubmit.year <= 0) {
+      toast.error('Please enter a valid year.');
+      return;
+    }
+
     try {
-      await api.post('/admin/vehicles', newVehicle);
+      console.log(vehicleToSubmit);
+      await api.post('/admin/vehicles', vehicleToSubmit);
       toast.success('Vehicle added successfully.');
       setNewVehicle({
         make: '',
         model: '',
-        year: '',
-        licensePlate: '',
-        vehicleType: '',
-        driverID: '',
+        year: 0,
+        license_plate: '',
+        vehicle_type: '',
+        driver_id: '',
       });
       setShowAddForm(false);
       fetchVehicles();
@@ -136,8 +151,8 @@ const VehiclesTab = () => {
               <label className="block text-gray-700">License Plate</label>
               <input
                 type="text"
-                name="licensePlate"
-                value={newVehicle.licensePlate}
+                name="license_plate"
+                value={newVehicle.license_plate}
                 onChange={handleInputChange}
                 required
                 className="w-full border p-2 rounded"
@@ -146,8 +161,8 @@ const VehiclesTab = () => {
             <div>
               <label className="block text-gray-700">Vehicle Type</label>
               <select
-                name="vehicleType"
-                value={newVehicle.vehicleType}
+                name="vehicle_type"
+                value={newVehicle.vehicle_type}
                 onChange={handleInputChange}
                 required
                 className="w-full border p-2 rounded"
@@ -162,8 +177,8 @@ const VehiclesTab = () => {
               <label className="block text-gray-700">Assign Driver (Optional)</label>
               <input
                 type="text"
-                name="driverID"
-                value={newVehicle.driverID}
+                name="driver_id"
+                value={newVehicle.driver_id}
                 onChange={handleInputChange}
                 placeholder="Driver ID"
                 className="w-full border p-2 rounded"
@@ -202,10 +217,10 @@ const VehiclesTab = () => {
                 <td className="py-2 px-4 border-b">{vehicle.make}</td>
                 <td className="py-2 px-4 border-b">{vehicle.model}</td>
                 <td className="py-2 px-4 border-b">{vehicle.year}</td>
-                <td className="py-2 px-4 border-b">{vehicle.licensePlate}</td>
-                <td className="py-2 px-4 border-b">{vehicle.vehicleType}</td>
+                <td className="py-2 px-4 border-b">{vehicle.license_plate}</td>
+                <td className="py-2 px-4 border-b">{vehicle.vehicle_type}</td>
                 <td className="py-2 px-4 border-b">
-                  {vehicle.driverID ? vehicle.driverID : 'Unassigned'}
+                  {vehicle.driver_id ? vehicle.driver_id : 'Unassigned'}
                 </td>
                 <td className="py-2 px-4 border-b flex space-x-2">
                   <button
@@ -242,14 +257,14 @@ const VehiclesTab = () => {
               <strong>Year:</strong> {selectedVehicle.year}
             </p>
             <p>
-              <strong>License Plate:</strong> {selectedVehicle.licensePlate}
+              <strong>License Plate:</strong> {selectedVehicle.license_plate}
             </p>
             <p>
-              <strong>Vehicle Type:</strong> {selectedVehicle.vehicleType}
+              <strong>Vehicle Type:</strong> {selectedVehicle.vehicle_type}
             </p>
             <p>
               <strong>Driver ID:</strong>{' '}
-              {selectedVehicle.driverID ? selectedVehicle.driverID : 'Unassigned'}
+              {selectedVehicle.driver_id ? selectedVehicle.driver_id : 'Unassigned'}
             </p>
             <button
               className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"

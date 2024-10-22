@@ -361,6 +361,7 @@ const DriverDashboard = () => {
       // Set the accepted booking as the current booking
       const acceptedBooking = bookingRequests.find((b) => b.id === bookingId);
       setBookingDetails(acceptedBooking);
+      setBookingDetails({...acceptedBooking, status: "Driver Assigned"});
       setBookingRequests([]);
     } catch (err) {
       console.error("Error accepting booking:", err);

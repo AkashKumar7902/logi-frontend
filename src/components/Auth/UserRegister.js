@@ -84,7 +84,7 @@ function UserRegister() {
         </div>
 
         <div className="button-group">
-          <button type="submit">Login</button>
+          <button type="submit">Register</button>
         </div>
       </form>
     </div>
