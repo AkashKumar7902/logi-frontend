@@ -1,7 +1,7 @@
 // src/middleware/websocketMiddleware.js
 
 import ReconnectingWebSocket from 'reconnecting-websocket';
-import { websocketConnected, websocketDisconnected, receiveMessage } from '../slices/websocketSlice';
+import { websocketConnected, websocketDisconnected, receiveMessage, websocketError } from '../slices/websocketSlice';
 
 const websocketMiddleware = (storeAPI) => {
   let socket = null;
@@ -24,13 +24,16 @@ const websocketMiddleware = (storeAPI) => {
         });
 
         socket.addEventListener('message', (event) => {
-          console.log('WebSocket message:', event.data);
-          const data = JSON.parse(event.data);
-          storeAPI.dispatch(receiveMessage(data));
+          try {
+            const data = JSON.parse(event.data);
+            storeAPI.dispatch(receiveMessage(data));
+          } catch (error) {
+            storeAPI.dispatch(websocketError('Invalid WebSocket payload received'));
+          }
         });
 
-        socket.addEventListener('error', (error) => {
-          console.error('WebSocket error:', error);
+        socket.addEventListener('error', () => {
+          storeAPI.dispatch(websocketError('WebSocket connection error'));
         });
         break;
 

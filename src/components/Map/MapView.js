@@ -1,6 +1,6 @@
 // src/components/Map/MapView.js
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -26,16 +26,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-// Component to adjust map bounds only once
-const FitBounds = ({ bounds, bookingStatus }) => {
+const FitBounds = ({ bounds }) => {
   const map = useMap();
-  const hasFitted = useRef(false); // Ref to track if fitBounds has been called
 
   useEffect(() => {
-    if (!hasFitted.current && bounds.length > 0) {
+    if (bounds.length > 0) {
       const leafletBounds = L.latLngBounds(bounds);
       map.fitBounds(leafletBounds, { padding: [50, 50] });
-      hasFitted.current = true; // Mark as fitted
     }
   }, [bounds, map]);
 
@@ -91,20 +88,14 @@ const MapView = ({
         pickupLocation
       ) {
         newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([
-          pickupLocation.coordinates[0],
-          pickupLocation.coordinates[1],
-        ]);
+        newBounds.push([pickupLocation.latitude, pickupLocation.longitude]);
       } else if (
-        bookingStatus === "Picked Up" &&
+        (bookingStatus === "Goods Collected" || bookingStatus === "In Transit") &&
         driverLocation &&
         dropoffLocation
       ) {
         newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([
-          dropoffLocation.coordinates[0],
-          dropoffLocation.coordinates[1],
-        ]);
+        newBounds.push([dropoffLocation.latitude, dropoffLocation.longitude]);
       } else if (driverLocation) {
         newBounds.push([driverLocation.latitude, driverLocation.longitude]);
       }
@@ -184,10 +175,7 @@ const MapView = ({
           bookingStatus === "Completed") &&
         pickupLocation && (
           <Marker
-            position={[
-              pickupLocation.coordinates[0],
-              pickupLocation.coordinates[1],
-            ]}
+            position={[pickupLocation.latitude, pickupLocation.longitude]}
           >
             <Popup>Pickup Location: {pickupName || "Loading..."}</Popup>
           </Marker>
@@ -201,10 +189,7 @@ const MapView = ({
           bookingStatus === "Completed") &&
         dropoffLocation && (
           <Marker
-            position={[
-              dropoffLocation.coordinates[0],
-              dropoffLocation.coordinates[1],
-            ]}
+            position={[dropoffLocation.latitude, dropoffLocation.longitude]}
           >
             <Popup>Drop-off Location: {dropoffName || "Loading..."}</Popup>
           </Marker>
@@ -244,7 +229,7 @@ const MapView = ({
       )}
 
       {/* Adjust map bounds only once */}
-      <FitBounds bounds={bounds} bookingStatus={bookingStatus} />
+      <FitBounds bounds={bounds} />
     </MapContainer>
   );
 };

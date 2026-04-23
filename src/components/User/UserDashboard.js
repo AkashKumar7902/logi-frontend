@@ -10,6 +10,7 @@ import geocodingService from "../../services/geoCodingService"; // Import geocod
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AutocompleteSearch from "../Map/AutocompleteSearch";
+import { fromGeoJSONPoint, toGeoJSONPoint } from "../../services/location";
 
 const UserDashboard = () => {
   const dispatch = useDispatch();
@@ -45,18 +46,19 @@ const UserDashboard = () => {
     if (activeBooking) {
       // Fetch place names
       const fetchPlaceNames = async () => {
-        const pickupLat = activeBooking.pickup_location.coordinates[0];
-        const pickupLng = activeBooking.pickup_location.coordinates[1];
-        const dropoffLat = activeBooking.dropoff_location.coordinates[0];
-        const dropoffLng = activeBooking.dropoff_location.coordinates[1];
+        const pickupLocation = fromGeoJSONPoint(activeBooking.pickup_location);
+        const dropoffLocation = fromGeoJSONPoint(activeBooking.dropoff_location);
+        if (!pickupLocation || !dropoffLocation) {
+          return;
+        }
 
         const fetchedPickupName = await geocodingService.getPlaceName(
-          pickupLat,
-          pickupLng
+          pickupLocation.latitude,
+          pickupLocation.longitude
         );
         const fetchedDropoffName = await geocodingService.getPlaceName(
-          dropoffLat,
-          dropoffLng
+          dropoffLocation.latitude,
+          dropoffLocation.longitude
         );
 
         setPickupName(fetchedPickupName);
@@ -69,35 +71,26 @@ const UserDashboard = () => {
 
   useEffect(() => {
     if (activeBooking) {
+      const pickupLocation = fromGeoJSONPoint(activeBooking.pickup_location);
+      const dropoffLocation = fromGeoJSONPoint(activeBooking.dropoff_location);
+      if (!pickupLocation || !dropoffLocation) {
+        return;
+      }
+
       if (activeBooking.status === "Pending") {
-        fetchRoute(
-          {
-            latitude: activeBooking.pickup_location.coordinates[0],
-            longitude: activeBooking.pickup_location.coordinates[1],
-          },
-          {
-            latitude: activeBooking.dropoff_location.coordinates[0],
-            longitude: activeBooking.dropoff_location.coordinates[1],
-          }
-        );
+        fetchRoute(pickupLocation, dropoffLocation);
       }
       if (driverLocation) {
         if (
           activeBooking.status === "Driver Assigned" ||
           activeBooking.status === "En Route to Pickup"
         ) {
-          fetchRoute(driverLocation, {
-            latitude: activeBooking.pickup_location.coordinates[0],
-            longitude: activeBooking.pickup_location.coordinates[1],
-          });
+          fetchRoute(driverLocation, pickupLocation);
         } else if (
           activeBooking.status === "In Transit" ||
           activeBooking.status === "Goods Collected"
         ) {
-          fetchRoute(driverLocation, {
-            latitude: activeBooking.dropoff_location.coordinates[0],
-            longitude: activeBooking.dropoff_location.coordinates[1],
-          });
+          fetchRoute(driverLocation, dropoffLocation);
         }
       }
     }
@@ -168,10 +161,7 @@ const UserDashboard = () => {
       if (response.data) {
         console.log("driver details", response.data);
         setDriverDetails(response.data);
-        setDriverLocation({
-          latitude: response.data.location?.coordinates[0],
-          longitude: response.data.location?.coordinates[1],
-        });
+        setDriverLocation(fromGeoJSONPoint(response.data.location));
       }
     } catch (error) {
       console.error("Error fetching driver details:", error);
@@ -223,22 +213,8 @@ const UserDashboard = () => {
     setError(null);
     try {
       const bookingRequest = {
-        pickup_location: {
-          type: "Point",
-          coordinates: [
-            parseFloat(pickup.latitude),
-            parseFloat(pickup.longitude),
-          ],
-          name: pickupName, // Include place name
-        },
-        dropoff_location: {
-          type: "Point",
-          coordinates: [
-            parseFloat(dropoff.latitude),
-            parseFloat(dropoff.longitude),
-          ],
-          name: dropoffName, // Include place name
-        },
+        pickup_location: toGeoJSONPoint(pickup),
+        dropoff_location: toGeoJSONPoint(dropoff),
         vehicle_type: formData.vehicleType,
         scheduled_time: formData.scheduledTime
           ? new Date(formData.scheduledTime).toISOString()
@@ -272,20 +248,8 @@ const UserDashboard = () => {
     setError(null);
     try {
       const estimateRequest = {
-        pickup_location: {
-          type: "Point",
-          coordinates: [
-            parseFloat(pickup.longitude),
-            parseFloat(pickup.latitude),
-          ],
-        },
-        dropoff_location: {
-          type: "Point",
-          coordinates: [
-            parseFloat(formData.dropoffLongitude),
-            parseFloat(formData.dropoffLatitude),
-          ],
-        },
+        pickup_location: toGeoJSONPoint(pickup),
+        dropoff_location: toGeoJSONPoint(dropoff),
         vehicle_type: formData.vehicleType,
       };
 
@@ -501,22 +465,8 @@ const UserDashboard = () => {
           role="user"
           userLocation={userLocation}
           driverLocation={driverLocation}
-          pickupLocation={
-            activeBooking
-              ? {
-                  latitude: activeBooking.pickup_location.coordinates[0],
-                  longitude: activeBooking.pickup_location.coordinates[1],
-                }
-              : null
-          }
-          dropoffLocation={
-            activeBooking
-              ? {
-                  latitude: activeBooking.dropoff_location.coordinates[0],
-                  longitude: activeBooking.dropoff_location.coordinates[1],
-                }
-              : null
-          }
+          pickupLocation={activeBooking ? fromGeoJSONPoint(activeBooking.pickup_location) : null}
+          dropoffLocation={activeBooking ? fromGeoJSONPoint(activeBooking.dropoff_location) : null}
           pickupName={pickupName} // Pass place name
           dropoffName={dropoffName} // Pass place name
           bookingStatus={activeBooking?.status}

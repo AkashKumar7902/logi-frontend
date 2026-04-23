@@ -74,9 +74,7 @@ const DriversTab = () => {
     }
 
     try {
-      // Assign driver to vehicle
-      await api.put(`/admin/drivers/${driverID}`, { vehicleID });
-      await api.put(`/admin/vehicles/${vehicleID}`, { driverID });
+      await api.put(`/admin/drivers/${driverID}`, { vehicle_id: vehicleID });
 
       toast.success("Driver assigned to vehicle successfully.");
       setAssignDriver({ driverID: "", vehicleID: "" });
@@ -145,7 +143,7 @@ const DriversTab = () => {
               >
                 <option value="">Select Driver</option>
                 {drivers
-                  .filter((driver) => !driver.vehicleID) // Only available drivers
+                  .filter((driver) => !driver.vehicle_id) // Only available drivers
                   .map((driver) => (
                     <option key={driver.id} value={driver.id}>
                       {driver.name} (Email: {driver.email})
@@ -168,7 +166,7 @@ const DriversTab = () => {
               >
                 <option value="">Select Vehicle</option>
                 {vehicles
-                  .filter((vehicle) => !vehicle.driverID) // Only available vehicles
+                  .filter((vehicle) => !vehicle.driver_id) // Only available vehicles
                   .map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
                       {vehicle.make} {vehicle.model} ({vehicle.vehicle_type})
@@ -212,7 +210,7 @@ const DriversTab = () => {
                 <td className="py-2 px-4 border-b">{driver.name}</td>
                 <td className="py-2 px-4 border-b">{driver.email}</td>
                 <td className="py-2 px-4 border-b">
-                  {driver.vehicleID ? driver.vehicleID : "Unassigned"}
+                  {driver.vehicle_id ? driver.vehicle_id : "Unassigned"}
                 </td>
                 <td className="py-2 px-4 border-b">
                   <span
@@ -275,7 +273,7 @@ const DriversTab = () => {
             </p>
             <p>
               <strong>Vehicle ID:</strong>{" "}
-              {selectedDriver.vehicleID ? selectedDriver.vehicleID : "Unassigned"}
+              {selectedDriver.vehicle_id ? selectedDriver.vehicle_id : "Unassigned"}
             </p>
             <p>
               <strong>Status:</strong>{" "}
