@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import api from "../../services/api";
 import MapView from "../Map/MapView";
 import AvailabilitySwitch from "../shared/AvailabilitySwitch";
-import { clearMessages, receiveMessage } from "../../slices/websocketSlice";
+import { clearMessages } from "../../slices/websocketSlice";
 import routingService from "../../services/routingService";
 import geocodingService from "../../services/geoCodingService"; // Import geocoding service
 import { toast, ToastContainer } from "react-toastify";
@@ -38,7 +38,6 @@ const DriverDashboard = () => {
 
     messages.forEach((msg) => {
       if (msg.type === "new_booking_request" && isOnline) {
-        console.log("New booking request received:", msg.payload);
         // New booking request received
         handleNewBookingRequest(msg.payload);
       }
@@ -62,7 +61,6 @@ const DriverDashboard = () => {
 
   useEffect(() => {
     if (bookingDetails) {
-      console.log(bookingDetails);
       // Fetch place names
       const fetchPlaceNames = async () => {
         const pickupLocation = fromGeoJSONPoint(bookingDetails.pickup_location);
@@ -277,7 +275,6 @@ const DriverDashboard = () => {
     }
     try {
       const res = await api.get("/drivers/active-bookings");
-      console.log("active booking", res.data);
       if (res.data && res.data.length > 0) {
         setBookingDetails(res.data[0]);
       }
@@ -443,8 +440,6 @@ const DriverDashboard = () => {
       toast.error("Failed to fetch route.");
     }
   };
-
-  console.log(bookingRequests);
 
   return (
     <div className="flex flex-col md:flex-row h-screen">

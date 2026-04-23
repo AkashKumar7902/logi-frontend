@@ -9,9 +9,10 @@ function DriverRegister() {
     name: "",
     email: "",
     password: "",
+    vehicle_type: "car",
   });
 
-  const { name, email, password } = formData;
+  const { name, email, password, vehicle_type } = formData;
 
   const onChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -19,7 +20,7 @@ function DriverRegister() {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/drivers/register", { name, email, password });
+      await api.post("/drivers/register", { name, email, password, vehicle_type });
       navigate("/login/driver");
     } catch (err) {
       console.error(err.response.data.error);
@@ -71,6 +72,21 @@ function DriverRegister() {
             required
           />
           {/* <div className="error-message">Password must be at least 6 characters</div> */}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="vehicle_type">Vehicle Type</label>
+          <select
+            id="vehicle_type"
+            name="vehicle_type"
+            value={vehicle_type}
+            onChange={onChange}
+            required
+          >
+            <option value="bike">Bike</option>
+            <option value="car">Car</option>
+            <option value="van">Van</option>
+          </select>
         </div>
 
         <div className="button-group">

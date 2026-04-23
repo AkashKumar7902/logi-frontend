@@ -5,7 +5,7 @@ import api from "../../services/api";
 import { toast } from "react-toastify";
 import { FaTrash, FaInfoCircle } from "react-icons/fa";
 import { useSelector, useDispatch } from "react-redux";
-import { receiveMessage, clearMessages } from "../../slices/websocketSlice";
+import { clearMessages } from "../../slices/websocketSlice";
 
 const DriversTab = () => {
   const dispatch = useDispatch();

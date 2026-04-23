@@ -124,7 +124,6 @@ const UserDashboard = () => {
         }
       }
       if (msg.type === "driver_location") {
-        console.log("Driver Location:", msg);
         if (msg.payload.booking_id === activeBooking?.id) {
           setDriverLocation({
             latitude: msg.payload.latitude,
@@ -142,7 +141,6 @@ const UserDashboard = () => {
     setLoading(true);
     try {
       const response = await api.get("/active-booking");
-      console.log(response.data);
       if (response.data) {
         setActiveBooking(response.data);
         fetchDriverDetails(response.data.id);
@@ -159,7 +157,6 @@ const UserDashboard = () => {
     try {
       const response = await api.get(`/bookings/${bookingId}/driver`);
       if (response.data) {
-        console.log("driver details", response.data);
         setDriverDetails(response.data);
         setDriverLocation(fromGeoJSONPoint(response.data.location));
       }
@@ -223,7 +220,6 @@ const UserDashboard = () => {
 
       const response = await api.post("/bookings", bookingRequest);
       if (response.data) {
-        console.log("booking created", response.data);
         setActiveBooking(response.data);
         setShowBookingForm(false);
         toast.success("Booking created successfully.");
@@ -269,7 +265,6 @@ const UserDashboard = () => {
 
   // Fetch route between two points
   const fetchRoute = async (start, end) => {
-    console.log("Fetching route...");
     if (!start || !end) return;
     const startCoords = {
       latitude: parseFloat(start.latitude),
