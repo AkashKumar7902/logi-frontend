@@ -1,28 +1,23 @@
-// src/components/Map/AutocompleteSearch.js
-
 import React, { useState } from 'react';
 import Autosuggest from 'react-autosuggest';
 import axios from 'axios';
 import PropTypes from 'prop-types';
-import './AutocompleteSearch.css'; // Optional: For custom styling
+import './AutocompleteSearch.css';
+import { mapboxToken } from '../../config';
 
 const AutocompleteSearch = ({ label, onSelect }) => {
   const [value, setValue] = useState('');
   const [suggestions, setSuggestions] = useState([]);
 
-  const mapboxToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 'sk.eyJ1IjoiYWthc2hrdW1hcjc5MDIiLCJhIjoiY20yZGFiNXYzMWI3dzJqcjI2NzRrcmF5ZyJ9.8d1Ub4RFmIJStFo2XYLlcg';
-
-  const fetchSuggestions = async ({ value }) => {
-    if (!value) {
+  const fetchSuggestions = async ({ value: query }) => {
+    if (!query || !mapboxToken) {
       setSuggestions([]);
       return;
     }
 
     try {
       const response = await axios.get(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          value
-        )}.json`,
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`,
         {
           params: {
             access_token: mapboxToken,
@@ -45,8 +40,8 @@ const AutocompleteSearch = ({ label, onSelect }) => {
     }
   };
 
-  const onSuggestionsFetchRequested = ({ value }) => {
-    fetchSuggestions({ value });
+  const onSuggestionsFetchRequested = ({ value: query }) => {
+    fetchSuggestions({ value: query });
   };
 
   const onSuggestionsClearRequested = () => {

@@ -1,20 +1,19 @@
-// src/index.js
 import React from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App';
-import './index.css'; 
-import { Provider } from 'react-redux';
 import store from './store';
-import './leafletConfig'; 
+import './index.css';
+import './leafletConfig';
 import 'leaflet/dist/leaflet.css';
 
+const root = ReactDOM.createRoot(document.getElementById('root'));
 
-ReactDOM.render(
+root.render(
   <Provider store={store}>
     <AuthProvider>
       <App />
     </AuthProvider>
-  </Provider>,
-  document.getElementById('root')
+  </Provider>
 );

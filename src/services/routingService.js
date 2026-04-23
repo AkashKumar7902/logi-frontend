@@ -1,16 +1,13 @@
-// src/services/routingService.js
-
-import {LocalConvenienceStoreOutlined} from '@mui/icons-material';
 import axios from 'axios';
+import { mapboxToken } from '../config';
 
-// Replace with your actual Mapbox Access Token
-const MAPBOX_ACCESS_TOKEN = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 'sk.eyJ1IjoiYWthc2hrdW1hcjc5MDIiLCJhIjoiY20yZGFiNXYzMWI3dzJqcjI2NzRrcmF5ZyJ9.8d1Ub4RFmIJStFo2XYLlcg';
-
-// Base URL for Mapbox Directions API
 const DIRECTIONS_URL = 'https://api.mapbox.com/directions/v5/mapbox/driving';
 
 const getRoute = async (start, end) => {
-    console.log(start, end);
+  if (!mapboxToken) {
+    return null;
+  }
+
   try {
     const coordinates = `${start.longitude},${start.latitude};${end.longitude},${end.latitude}`;
     const response = await axios.get(`${DIRECTIONS_URL}/${coordinates}`, {
@@ -18,25 +15,24 @@ const getRoute = async (start, end) => {
         alternatives: false,
         geometries: 'geojson',
         steps: false,
-        access_token: MAPBOX_ACCESS_TOKEN,
+        access_token: mapboxToken,
       },
     });
 
-    // Extract the route geometry
     const route = response.data.routes[0];
-    const geometry = route.geometry;
+    if (!route || !route.geometry || !route.geometry.coordinates) {
+      return null;
+    }
 
-    // Mapbox provides coordinates in [longitude, latitude] format
-    // Convert them to [latitude, longitude] for Leaflet
-    const routeCoordinates = geometry.coordinates.map(coord => [coord[1], coord[0]]);
-
-    return routeCoordinates;
+    return route.geometry.coordinates.map((coord) => [coord[1], coord[0]]);
   } catch (error) {
     console.error('Error fetching route:', error);
     return null;
   }
 };
 
-export default {
+const routingService = {
   getRoute,
 };
+
+export default routingService;

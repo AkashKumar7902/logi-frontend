@@ -13,14 +13,17 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PropTypes from "prop-types";
 import "react-toastify/dist/ReactToastify.css";
+import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
 // Fix Leaflet's default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
 
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png").default,
-  iconUrl: require("leaflet/dist/images/marker-icon.png").default,
-  shadowUrl: require("leaflet/dist/images/marker-shadow.png").default,
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
 });
 
 // Component to adjust map bounds only once
