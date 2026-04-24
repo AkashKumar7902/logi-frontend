@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import api from '../../services/api';
+import api, { getApiErrorMessage } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import '../Common/Form.css';
 
@@ -11,6 +11,7 @@ function DriverRegister() {
     password: "",
     vehicle_type: "car",
   });
+  const [error, setError] = useState("");
 
   const { name, email, password, vehicle_type } = formData;
 
@@ -19,17 +20,19 @@ function DriverRegister() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     try {
       await api.post("/drivers/register", { name, email, password, vehicle_type });
       navigate("/login/driver");
     } catch (err) {
-      console.error(err.response.data.error);
+      setError(getApiErrorMessage(err, "Unable to register"));
     }
   };
 
   return (
     <div className="form-container">
       <h2>Driver Registration</h2>
+      {error && <p className="error-message">{error}</p>}
       <form onSubmit={onSubmit}>
         <div className="form-group">
           <label htmlFor="name">Name</label>

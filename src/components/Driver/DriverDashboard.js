@@ -10,7 +10,6 @@ import routingService from "../../services/routingService";
 import geocodingService from "../../services/geoCodingService"; // Import geocoding service
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import "./DriverDashboard.css"; // Optional: For custom styling
 import { FaCheck, FaTimes } from "react-icons/fa";
 import { fromGeoJSONPoint } from "../../services/location";
 
@@ -164,28 +163,30 @@ const DriverDashboard = () => {
 
   // Handle availability toggle
   const handleToggleAvailability = async (checked) => {
-    setIsOnline(checked);
+    if (checked === isOnline) return;
+
     if (checked) {
-      // Driver is now online
-      startSendingLocation();
-      // Optionally, notify backend about availability
       try {
         await api.post("/drivers/status", { status: "Available" });
+        setIsOnline(true);
+        startSendingLocation();
         await fetchPendingBookings();
         toast.success("You are now Online.");
       } catch (err) {
         console.error(err);
+        setIsOnline(false);
+        stopSendingLocation();
         toast.error("Failed to update availability.");
       }
     } else {
-      // Driver is now offline
-      stopSendingLocation();
-      // Optionally, notify backend about availability
       try {
         await api.post("/drivers/status", { status: "Offline" });
+        setIsOnline(false);
+        stopSendingLocation();
         toast.info("You are now Offline.");
       } catch (err) {
         console.error(err);
+        setIsOnline(true);
         toast.error("Failed to update availability.");
       }
     }
@@ -193,6 +194,7 @@ const DriverDashboard = () => {
 
   // Start sending location every 5 seconds
   const startSendingLocation = () => {
+    stopSendingLocation();
     sendLocation(); // Send immediately
     locationIntervalRef.current = setInterval(sendLocation, 5000);
   };

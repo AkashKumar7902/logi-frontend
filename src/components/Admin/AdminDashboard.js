@@ -5,6 +5,8 @@ import GeneralTab from './GeneralTab';
 import VehiclesTab from './VehiclesTab';
 import DriversTab from './DriversTab';
 import { FaTachometerAlt, FaTruck, FaUsers } from 'react-icons/fa';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './AdminDashboard.css'; // Optional: For custom styling
 
 const AdminDashboard = () => {
@@ -25,6 +27,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard-container flex h-screen">
+      <ToastContainer />
       {/* Left Panel - Navigation */}
       <div className="w-1/4 bg-gray-800 text-white p-4">
         <h2 className="text-2xl font-bold mb-6 text-center">Admin Dashboard</h2>

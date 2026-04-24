@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import api from '../../services/api';
+import api, { getApiErrorMessage } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../../contexts/AuthContext";
 import '../Common/Form.css';
@@ -10,6 +10,7 @@ function DriverLogin() {
 
   const { login } = useAuth();
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
 
   const { email, password } = formData;
 
@@ -18,18 +19,20 @@ function DriverLogin() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     try {
       const res = await api.post("/drivers/login", { email, password });
       login(res.data.token);
       navigate("/driver");
     } catch (err) {
-      console.error(err.response.data.error);
+      setError(getApiErrorMessage(err, "Unable to log in"));
     }
   };
 
   return (
     <div className="form-container">
       <h2>Driver Login</h2>
+      {error && <p className="error-message">{error}</p>}
       <form onSubmit={onSubmit}>
         <div className="form-group">
           <label htmlFor="email">Email</label>
