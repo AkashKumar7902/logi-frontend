@@ -18,6 +18,7 @@ import {
   userIcon,
   ROUTE_COLORS,
 } from "./markers";
+import Skeleton from "../shared/Skeleton";
 
 const FitBounds = ({ bounds }) => {
   const map = useMap();
@@ -169,7 +170,10 @@ const MapView = ({
           icon={pickupIcon}
         >
           <Popup>
-            <PopupLabel label="Pickup" title={pickupName || "Loading..."} />
+            <PopupLabel
+              label="Pickup"
+              title={pickupName || <Skeleton height={12} className="w-32 mt-1" />}
+            />
           </Popup>
         </Marker>
       )}
@@ -180,7 +184,10 @@ const MapView = ({
           icon={dropoffIcon}
         >
           <Popup>
-            <PopupLabel label="Drop-off" title={dropoffName || "Loading..."} />
+            <PopupLabel
+              label="Drop-off"
+              title={dropoffName || <Skeleton height={12} className="w-32 mt-1" />}
+            />
           </Popup>
         </Marker>
       )}

@@ -23,6 +23,7 @@ import { fromGeoJSONPoint } from "../../services/location";
 import Button from "../shared/Button";
 import Badge from "../shared/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "../shared/Card";
+import Skeleton from "../shared/Skeleton";
 
 const STATUS_META = {
   Pending: { tone: "warning", label: "Pending" },
@@ -381,20 +382,28 @@ const DriverDashboard = () => {
         <CardBody className="space-y-3">
           <div className="flex items-start gap-3">
             <FaMapMarkerAlt className="mt-0.5 text-ink-400 dark:text-ink-500 shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-ink-500 dark:text-ink-400">Pickup</p>
-              <p className="text-sm text-ink-900 dark:text-ink-50 font-medium break-words">
-                {pickupName || <span className="text-ink-400 dark:text-ink-500">Loading...</span>}
-              </p>
+              {pickupName ? (
+                <p className="text-sm text-ink-900 dark:text-ink-50 font-medium break-words">
+                  {pickupName}
+                </p>
+              ) : (
+                <Skeleton height={14} className="mt-1 w-40" />
+              )}
             </div>
           </div>
           <div className="flex items-start gap-3">
             <FaMapMarkerAlt className="mt-0.5 text-ink-400 dark:text-ink-500 shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-ink-500 dark:text-ink-400">Drop-off</p>
-              <p className="text-sm text-ink-900 dark:text-ink-50 font-medium break-words">
-                {dropoffName || <span className="text-ink-400 dark:text-ink-500">Loading...</span>}
-              </p>
+              {dropoffName ? (
+                <p className="text-sm text-ink-900 dark:text-ink-50 font-medium break-words">
+                  {dropoffName}
+                </p>
+              ) : (
+                <Skeleton height={14} className="mt-1 w-40" />
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-ink-100 dark:border-ink-700">
@@ -453,17 +462,25 @@ const DriverDashboard = () => {
             >
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
                     <FaMapMarkerAlt className="mt-0.5 text-ink-400 dark:text-ink-500 shrink-0 text-xs" />
-                    <span className="text-sm text-ink-900 dark:text-ink-50 truncate">
-                      {booking.pickupName || "Loading..."}
-                    </span>
+                    {booking.pickupName ? (
+                      <span className="text-sm text-ink-900 dark:text-ink-50 truncate">
+                        {booking.pickupName}
+                      </span>
+                    ) : (
+                      <Skeleton height={12} className="mt-1 w-32" />
+                    )}
                   </div>
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
                     <FaMapMarkerAlt className="mt-0.5 text-brand-500 shrink-0 text-xs" />
-                    <span className="text-sm text-ink-900 dark:text-ink-50 truncate">
-                      {booking.dropoffName || "Loading..."}
-                    </span>
+                    {booking.dropoffName ? (
+                      <span className="text-sm text-ink-900 dark:text-ink-50 truncate">
+                        {booking.dropoffName}
+                      </span>
+                    ) : (
+                      <Skeleton height={12} className="mt-1 w-32" />
+                    )}
                   </div>
                   <div className="flex items-center gap-3 pt-1 text-xs text-ink-500 dark:text-ink-400">
                     <span className="inline-flex items-center gap-1">

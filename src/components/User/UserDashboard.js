@@ -326,10 +326,10 @@ const UserDashboard = () => {
             </CardHeader>
             <CardBody className="py-2">
               <DetailLine icon={FaMapMarkerAlt} label="Pickup">
-                {pickupName || <span className="text-ink-400">Loading...</span>}
+                {pickupName || <Skeleton height={14} className="w-40" />}
               </DetailLine>
               <DetailLine icon={FaMapMarkerAlt} label="Drop-off">
-                {dropoffName || <span className="text-ink-400">Loading...</span>}
+                {dropoffName || <Skeleton height={14} className="w-40" />}
               </DetailLine>
               <DetailLine icon={FaCar} label="Vehicle">
                 <span className="capitalize">{activeBooking.vehicle_type}</span>
