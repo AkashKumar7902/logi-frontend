@@ -1,11 +1,44 @@
-// src/components/Admin/DriversTab.js
-
 import React, { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { FaTrash, FaInfoCircle } from "react-icons/fa";
 import api from "../../services/api";
 import { toast } from "react-toastify";
-import { FaTrash, FaInfoCircle } from "react-icons/fa";
-import { useSelector, useDispatch } from "react-redux";
 import { clearMessages } from "../../slices/websocketSlice";
+import Button from "../shared/Button";
+import Select from "../shared/Select";
+import Modal from "../shared/Modal";
+import Badge from "../shared/Badge";
+import { Card, CardBody, CardHeader, CardTitle } from "../shared/Card";
+import Skeleton from "../shared/Skeleton";
+
+function statusTone(status) {
+  if (status === "Available") return "success";
+  if (status === "Busy") return "warning";
+  return "danger";
+}
+
+function DetailRow({ label, children }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-ink-100 dark:border-ink-700 last:border-b-0">
+      <span className="text-sm text-ink-500 dark:text-ink-400">{label}</span>
+      <span className="text-sm font-medium text-ink-900 dark:text-ink-50 text-right">{children}</span>
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 4, cols = 7 }) {
+  return (
+    <div className="space-y-2 p-4">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-4">
+          {Array.from({ length: cols }).map((__, c) => (
+            <Skeleton key={c} height={14} className="flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const DriversTab = () => {
   const dispatch = useDispatch();
@@ -16,6 +49,7 @@ const DriversTab = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [assignDriver, setAssignDriver] = useState({
     driverID: "",
     vehicleID: "",
@@ -34,9 +68,7 @@ const DriversTab = () => {
           const { driver_id, status } = msg.payload;
           updateDriverStatus(driver_id, status);
         }
-        // Handle other message types if needed
       });
-      // Clear messages after processing
       dispatch(clearMessages());
     }
     // eslint-disable-next-line
@@ -45,7 +77,7 @@ const DriversTab = () => {
   const fetchDrivers = async () => {
     try {
       const response = await api.get("/admin/drivers");
-      setDrivers(response.data);
+      setDrivers(response.data || []);
     } catch (error) {
       console.error("Error fetching drivers:", error);
       toast.error("Failed to fetch drivers.");
@@ -57,7 +89,7 @@ const DriversTab = () => {
   const fetchVehicles = async () => {
     try {
       const response = await api.get("/admin/vehicles");
-      setVehicles(response.data);
+      setVehicles(response.data || []);
     } catch (error) {
       console.error("Error fetching vehicles:", error);
       toast.error("Failed to fetch vehicles.");
@@ -67,15 +99,13 @@ const DriversTab = () => {
   const handleAssign = async (e) => {
     e.preventDefault();
     const { driverID, vehicleID } = assignDriver;
-
     if (!driverID || !vehicleID) {
       toast.error("Please select both driver and vehicle.");
       return;
     }
-
+    setAssigning(true);
     try {
       await api.put(`/admin/drivers/${driverID}`, { vehicle_id: vehicleID });
-
       toast.success("Driver assigned to vehicle successfully.");
       setAssignDriver({ driverID: "", vehicleID: "" });
       fetchDrivers();
@@ -83,6 +113,8 @@ const DriversTab = () => {
     } catch (error) {
       console.error("Error assigning driver:", error);
       toast.error("Failed to assign driver to vehicle.");
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -98,220 +130,208 @@ const DriversTab = () => {
       completed_bookings_count,
     } = driver;
     if (total_bookings_count === 0) return "0.00";
-    const acceptanceRate =
-      (accepted_bookings_count / total_bookings_count) * 100;
+    const acceptanceRate = (accepted_bookings_count / total_bookings_count) * 100;
     const completionRate =
       accepted_bookings_count === 0
         ? 0
         : (completed_bookings_count / accepted_bookings_count) * 100;
-    const performanceScore = ((acceptanceRate + completionRate) / 2).toFixed(2);
-    return performanceScore;
+    return ((acceptanceRate + completionRate) / 2).toFixed(2);
   };
 
   const updateDriverStatus = (driverID, newStatus) => {
-    setDrivers((prevDrivers) =>
-      prevDrivers.map((driver) =>
-        driver.id === driverID ? { ...driver, status: newStatus } : driver
-      )
+    setDrivers((prev) =>
+      prev.map((d) => (d.id === driverID ? { ...d, status: newStatus } : d)),
     );
     toast.info(`Driver ${driverID} status updated to ${newStatus}.`);
   };
 
-  if (loading) {
-    return <p>Loading drivers...</p>;
-  }
+  const availableDrivers = drivers.filter((d) => !d.vehicle_id);
+  const availableVehicles = vehicles.filter((v) => !v.driver_id);
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">Drivers Management</h2>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">Drivers</h1>
+        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+          Assign vehicles, monitor status, and review performance.
+        </p>
+      </div>
 
-      {/* Assign Driver to Vehicle Form */}
-      <form onSubmit={handleAssign} className="mb-6 bg-white p-4 shadow rounded">
-        <h3 className="text-xl font-semibold mb-4">Assign Driver to Vehicle</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700">Select Driver</label>
-            {drivers && (
-              <select
-                name="driverID"
-                value={assignDriver.driverID}
-                onChange={(e) =>
-                  setAssignDriver({ ...assignDriver, driverID: e.target.value })
-                }
-                required
-                className="w-full border p-2 rounded"
-              >
-                <option value="">Select Driver</option>
-                {drivers
-                  .filter((driver) => !driver.vehicle_id) // Only available drivers
-                  .map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.name} (Email: {driver.email})
-                    </option>
-                  ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="block text-gray-700">Select Vehicle</label>
-            {vehicles && (
-              <select
-                name="vehicleID"
-                value={assignDriver.vehicleID}
-                onChange={(e) =>
-                  setAssignDriver({ ...assignDriver, vehicleID: e.target.value })
-                }
-                required
-                className="w-full border p-2 rounded"
-              >
-                <option value="">Select Vehicle</option>
-                {vehicles
-                  .filter((vehicle) => !vehicle.driver_id) // Only available vehicles
-                  .map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.make} {vehicle.model} ({vehicle.vehicle_type})
-                    </option>
-                  ))}
-              </select>
-            )}
-          </div>
-        </div>
-        <button
-          type="submit"
-          className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          Assign
-        </button>
-      </form>
-
-      {/* Drivers List */}
-      <table className="w-full bg-white shadow rounded">
-        <thead>
-          <tr>
-            <th className="py-2 px-4 border-b">Name</th>
-            <th className="py-2 px-4 border-b">Email</th>
-            <th className="py-2 px-4 border-b">Vehicle ID</th>
-            <th className="py-2 px-4 border-b">Status</th>
-            <th className="py-2 px-4 border-b">Completed Bookings</th>
-            <th className="py-2 px-4 border-b">Performance Score</th>
-            <th className="py-2 px-4 border-b">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {drivers.length === 0 ? (
-            <tr>
-              <td colSpan="7" className="text-center py-4">
-                No drivers found.
-              </td>
-            </tr>
-          ) : (
-            drivers.map((driver) => (
-              <tr key={driver.id}>
-                <td className="py-2 px-4 border-b">{driver.name}</td>
-                <td className="py-2 px-4 border-b">{driver.email}</td>
-                <td className="py-2 px-4 border-b">
-                  {driver.vehicle_id ? driver.vehicle_id : "Unassigned"}
-                </td>
-                <td className="py-2 px-4 border-b">
-                  <span
-                    className={`px-2 py-1 rounded-full text-white ${
-                      driver.status === "Available"
-                        ? "bg-green-500"
-                        : driver.status === "Busy"
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }`}
-                  >
-                    {driver.status}
-                  </span>
-                </td>
-                <td className="py-2 px-4 border-b">
-                  {driver.completed_bookings_count}
-                </td>
-                <td className="py-2 px-4 border-b">
-                  {calculatePerformanceScore(driver)}%
-                </td>
-                <td className="py-2 px-4 border-b flex space-x-2">
-                  <button
-                    className="text-blue-500 hover:text-blue-700"
-                    onClick={() => handleViewDetails(driver)}
-                  >
-                    <FaInfoCircle />
-                  </button>
-                  <button
-                    className="text-red-500 hover:text-red-700"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Are you sure you want to remove this driver?"
-                        )
-                      ) {
-                        // Implement driver deletion if needed
-                        toast.info("Driver removal not implemented.");
-                      }
-                    }}
-                  >
-                    <FaTrash />
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      {/* Driver Details Modal */}
-      {showDetails && selectedDriver && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded shadow-lg w-1/3">
-            <h3 className="text-xl font-semibold mb-4">Driver Details</h3>
-            <p>
-              <strong>Name:</strong> {selectedDriver.name}
-            </p>
-            <p>
-              <strong>Email:</strong> {selectedDriver.email}
-            </p>
-            <p>
-              <strong>Vehicle ID:</strong>{" "}
-              {selectedDriver.vehicle_id ? selectedDriver.vehicle_id : "Unassigned"}
-            </p>
-            <p>
-              <strong>Status:</strong>{" "}
-              <span
-                className={`px-2 py-1 rounded-full text-white ${
-                  selectedDriver.status === "Available"
-                    ? "bg-green-500"
-                    : selectedDriver.status === "Busy"
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-                }`}
-              >
-                {selectedDriver.status}
-              </span>
-            </p>
-            <p>
-              <strong>Total Bookings:</strong> {selectedDriver.total_bookings_count}
-            </p>
-            <p>
-              <strong>Accepted Bookings:</strong> {selectedDriver.accepted_bookings_count}
-            </p>
-            <p>
-              <strong>Completed Bookings:</strong>{" "}
-              {selectedDriver.completed_bookings_count}
-            </p>
-            <p>
-              <strong>Performance Score:</strong>{" "}
-              {calculatePerformanceScore(selectedDriver)}%
-            </p>
-            <button
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
-              onClick={() => setShowDetails(false)}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Assign driver to vehicle</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <form onSubmit={handleAssign} className="grid gap-4 sm:grid-cols-2">
+            <Select
+              label="Driver"
+              name="driverID"
+              value={assignDriver.driverID}
+              onChange={(e) =>
+                setAssignDriver({ ...assignDriver, driverID: e.target.value })
+              }
+              required
             >
-              Close
-            </button>
-          </div>
+              <option value="">Select a driver</option>
+              {availableDrivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} — {d.email}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Vehicle"
+              name="vehicleID"
+              value={assignDriver.vehicleID}
+              onChange={(e) =>
+                setAssignDriver({ ...assignDriver, vehicleID: e.target.value })
+              }
+              required
+            >
+              <option value="">Select a vehicle</option>
+              {availableVehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.make} {v.model} ({v.vehicle_type})
+                </option>
+              ))}
+            </Select>
+            <div className="sm:col-span-2 flex justify-end">
+              <Button type="submit" loading={assigning}>
+                Assign
+              </Button>
+            </div>
+          </form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All drivers</CardTitle>
+          <span className="text-sm text-ink-500 dark:text-ink-400">
+            {loading ? "—" : `${drivers.length} total`}
+          </span>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <TableSkeleton rows={5} cols={7} />
+          ) : drivers.length === 0 ? (
+            <div className="text-center py-12 px-4">
+              <p className="text-sm text-ink-500 dark:text-ink-400">No drivers yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-ink-50 dark:bg-ink-900/50 text-ink-500 dark:text-ink-400 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="text-left font-medium py-3 px-4">Name</th>
+                  <th className="text-left font-medium py-3 px-4">Email</th>
+                  <th className="text-left font-medium py-3 px-4">Vehicle</th>
+                  <th className="text-left font-medium py-3 px-4">Status</th>
+                  <th className="text-right font-medium py-3 px-4">Completed</th>
+                  <th className="text-right font-medium py-3 px-4">Score</th>
+                  <th className="text-right font-medium py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100 dark:divide-ink-700">
+                {drivers.map((d) => (
+                  <tr key={d.id} className="hover:bg-ink-50/50 dark:hover:bg-ink-900/40 transition-colors">
+                    <td className="py-3 px-4 font-medium text-ink-900 dark:text-ink-50">{d.name}</td>
+                    <td className="py-3 px-4 text-ink-600 dark:text-ink-300">{d.email}</td>
+                    <td className="py-3 px-4">
+                      {d.vehicle_id ? (
+                        <span className="text-ink-700 dark:text-ink-200 font-mono text-xs">{d.vehicle_id}</span>
+                      ) : (
+                        <Badge tone="neutral">Unassigned</Badge>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge tone={statusTone(d.status)} dot>
+                        {d.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-right tabular-nums text-ink-700 dark:text-ink-200">
+                      {d.completed_bookings_count}
+                    </td>
+                    <td className="py-3 px-4 text-right tabular-nums text-ink-700 dark:text-ink-200">
+                      {calculatePerformanceScore(d)}%
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(d)}
+                          aria-label="View details"
+                        >
+                          <FaInfoCircle />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Are you sure you want to remove this driver?",
+                              )
+                            ) {
+                              toast.info("Driver removal not implemented.");
+                            }
+                          }}
+                          aria-label="Remove driver"
+                          className="text-danger-600 hover:bg-danger-50 dark:text-danger-500 dark:hover:bg-danger-500/15"
+                        >
+                          <FaTrash />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-      )}
+      </Card>
+
+      <Modal
+        open={showDetails && !!selectedDriver}
+        onClose={() => setShowDetails(false)}
+        title="Driver details"
+        footer={
+          <Button variant="secondary" onClick={() => setShowDetails(false)}>
+            Close
+          </Button>
+        }
+      >
+        {selectedDriver && (
+          <div>
+            <DetailRow label="Name">{selectedDriver.name}</DetailRow>
+            <DetailRow label="Email">{selectedDriver.email}</DetailRow>
+            <DetailRow label="Vehicle">
+              {selectedDriver.vehicle_id ? (
+                <span className="font-mono text-xs">{selectedDriver.vehicle_id}</span>
+              ) : (
+                <Badge tone="neutral">Unassigned</Badge>
+              )}
+            </DetailRow>
+            <DetailRow label="Status">
+              <Badge tone={statusTone(selectedDriver.status)} dot>
+                {selectedDriver.status}
+              </Badge>
+            </DetailRow>
+            <DetailRow label="Total bookings">
+              {selectedDriver.total_bookings_count}
+            </DetailRow>
+            <DetailRow label="Accepted bookings">
+              {selectedDriver.accepted_bookings_count}
+            </DetailRow>
+            <DetailRow label="Completed bookings">
+              {selectedDriver.completed_bookings_count}
+            </DetailRow>
+            <DetailRow label="Performance score">
+              {calculatePerformanceScore(selectedDriver)}%
+            </DetailRow>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

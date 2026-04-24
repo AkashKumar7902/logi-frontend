@@ -1,6 +1,4 @@
-// src/components/Map/MapView.js
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -12,35 +10,53 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PropTypes from "prop-types";
-import "react-toastify/dist/ReactToastify.css";
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
-// Fix Leaflet's default icon issue
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl,
-  iconUrl,
-  shadowUrl,
-});
+import {
+  pickupIcon,
+  dropoffIcon,
+  driverIcon,
+  userIcon,
+  ROUTE_COLORS,
+} from "./markers";
 
 const FitBounds = ({ bounds }) => {
   const map = useMap();
-
   useEffect(() => {
     if (bounds.length > 0) {
-      const leafletBounds = L.latLngBounds(bounds);
-      map.fitBounds(leafletBounds, { padding: [50, 50] });
+      map.fitBounds(L.latLngBounds(bounds), { padding: [60, 60] });
     }
   }, [bounds, map]);
-
   return null;
 };
 
+const PRE_TRIP = new Set(["Pending"]);
+const EN_ROUTE_PICKUP = new Set(["Driver Assigned", "En Route to Pickup"]);
+const EN_ROUTE_DROPOFF = new Set(["Goods Collected", "In Transit", "Delivered"]);
+const SHOW_PICKUP = new Set([
+  "Pending",
+  "Driver Assigned",
+  "En Route to Pickup",
+  "Completed",
+]);
+const SHOW_DROPOFF = new Set([
+  "Pending",
+  "Goods Collected",
+  "In Transit",
+  "Delivered",
+  "Completed",
+]);
+
+function PopupLabel({ label, title }) {
+  return (
+    <>
+      <div className="logi-popup-label">{label}</div>
+      <div className="logi-popup-title">{title}</div>
+    </>
+  );
+}
+
 const MapView = ({
-  role, // 'user' or 'driver'
+  role,
   userLocation,
   driverLocation,
   pickupLocation,
@@ -53,184 +69,147 @@ const MapView = ({
   const [bounds, setBounds] = useState([]);
 
   useEffect(() => {
-    const newBounds = [];
+    const pts = [];
+    const addPt = (loc) => {
+      if (loc && loc.latitude != null && loc.longitude != null) {
+        pts.push([loc.latitude, loc.longitude]);
+      }
+    };
 
     if (role === "user") {
-      if (bookingStatus === "Pending" && pickupLocation && dropoffLocation) {
-        newBounds.push([pickupLocation.latitude, pickupLocation.longitude]);
-        newBounds.push([dropoffLocation.latitude, dropoffLocation.longitude]);
-      } else if (
-        (bookingStatus === "Driver Assigned" ||
-          bookingStatus === "En Route to Pickup") &&
-        driverLocation &&
-        pickupLocation
-      ) {
-        newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([pickupLocation.latitude, pickupLocation.longitude]);
-      } else if (
-        (bookingStatus === "Goods Collected" ||
-          bookingStatus === "In Transit") &&
-        dropoffLocation &&
-        driverLocation
-      ) {
-        newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([dropoffLocation.latitude, dropoffLocation.longitude]);
-      } else if (userLocation) {
-        newBounds.push([userLocation.latitude, userLocation.longitude]);
+      if (PRE_TRIP.has(bookingStatus)) {
+        addPt(pickupLocation);
+        addPt(dropoffLocation);
+      } else if (EN_ROUTE_PICKUP.has(bookingStatus)) {
+        addPt(driverLocation);
+        addPt(pickupLocation);
+      } else if (EN_ROUTE_DROPOFF.has(bookingStatus)) {
+        addPt(driverLocation);
+        addPt(dropoffLocation);
+      } else {
+        addPt(userLocation);
       }
     }
 
     if (role === "driver") {
-      if (
-        (bookingStatus === "Driver Assigned" ||
-          bookingStatus === "En Route to Pickup") &&
-        driverLocation &&
-        pickupLocation
-      ) {
-        newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([pickupLocation.latitude, pickupLocation.longitude]);
-      } else if (
-        (bookingStatus === "Goods Collected" || bookingStatus === "In Transit") &&
-        driverLocation &&
-        dropoffLocation
-      ) {
-        newBounds.push([driverLocation.latitude, driverLocation.longitude]);
-        newBounds.push([dropoffLocation.latitude, dropoffLocation.longitude]);
-      } else if (driverLocation) {
-        newBounds.push([driverLocation.latitude, driverLocation.longitude]);
+      if (EN_ROUTE_PICKUP.has(bookingStatus)) {
+        addPt(driverLocation);
+        addPt(pickupLocation);
+      } else if (EN_ROUTE_DROPOFF.has(bookingStatus)) {
+        addPt(driverLocation);
+        addPt(dropoffLocation);
+      } else {
+        addPt(driverLocation);
       }
     }
 
-    setBounds(newBounds);
-  }, [
-    role,
-    bookingStatus,
-    userLocation,
-    driverLocation,
-    pickupLocation,
-    dropoffLocation,
-  ]);
+    setBounds(pts);
+  }, [role, bookingStatus, userLocation, driverLocation, pickupLocation, dropoffLocation]);
+
+  const center = useMemo(() => {
+    if (role === "driver" && driverLocation) {
+      return [driverLocation.latitude, driverLocation.longitude];
+    }
+    if (role === "user" && userLocation) {
+      return [userLocation.latitude, userLocation.longitude];
+    }
+    return [20.5937, 78.9629];
+  }, [role, driverLocation, userLocation]);
+
+  const showDriverMarker =
+    driverLocation &&
+    (role === "driver" || (role === "user" && bookingStatus && bookingStatus !== "Pending"));
+
+  const showUserMarker =
+    role === "user" && !bookingStatus && userLocation;
+
+  const showPickupMarker = pickupLocation && SHOW_PICKUP.has(bookingStatus);
+  const showDropoffMarker = dropoffLocation && SHOW_DROPOFF.has(bookingStatus);
 
   return (
     <MapContainer
-      center={
-        role === "driver" && driverLocation
-          ? [driverLocation.latitude, driverLocation.longitude]
-          : [0, 0]
-      }
+      center={center}
       zoom={13}
       className="h-full w-full"
-      whenCreated={(map) => {
-        if (bounds.length > 0) {
-          const leafletBounds = L.latLngBounds(bounds);
-          map.fitBounds(leafletBounds, { padding: [50, 50] });
-        }
-      }}
+      zoomControl
     >
       <TileLayer
         attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Markers based on role and booking status */}
-      {role === "driver" &&
-        bookingStatus &&
-        bookingStatus !== "Pending" &&
-        driverLocation && (
-          <Marker
-            position={[driverLocation.latitude, driverLocation.longitude]}
-          >
-            <Popup>Your Current Location</Popup>
-          </Marker>
-        )}
-
-      {role === "driver" && !bookingStatus && driverLocation && (
-        <Marker position={[driverLocation.latitude, driverLocation.longitude]}>
-          <Popup>Your Current Location</Popup>
+      {showDriverMarker && (
+        <Marker
+          position={[driverLocation.latitude, driverLocation.longitude]}
+          icon={driverIcon}
+        >
+          <Popup>
+            <PopupLabel
+              label={role === "driver" ? "You" : "Driver"}
+              title={role === "driver" ? "Your current location" : "Live driver location"}
+            />
+          </Popup>
         </Marker>
       )}
 
-      {role === "user" &&
-        bookingStatus &&
-        bookingStatus !== "Pending" &&
-        driverLocation && (
-          <Marker
-            position={[driverLocation.latitude, driverLocation.longitude]}
-          >
-            <Popup>Driver Location</Popup>
-          </Marker>
-        )}
-
-      {role === "user" && !bookingStatus && userLocation && (
-        <Marker position={[userLocation.latitude, userLocation.longitude]}>
-          <Popup>Your current Location</Popup>
+      {showUserMarker && (
+        <Marker
+          position={[userLocation.latitude, userLocation.longitude]}
+          icon={userIcon}
+        >
+          <Popup>
+            <PopupLabel label="You" title="Your current location" />
+          </Popup>
         </Marker>
       )}
 
-      {/* Pickup Location Marker */}
-      {role === "driver" &&
-        (bookingStatus === "Driver Assigned" ||
-          bookingStatus === "En Route to Pickup" ||
-          bookingStatus === "Pending" ||
-          bookingStatus === "Completed") &&
-        pickupLocation && (
-          <Marker
-            position={[pickupLocation.latitude, pickupLocation.longitude]}
-          >
-            <Popup>Pickup Location: {pickupName || "Loading..."}</Popup>
-          </Marker>
-        )}
+      {showPickupMarker && (
+        <Marker
+          position={[pickupLocation.latitude, pickupLocation.longitude]}
+          icon={pickupIcon}
+        >
+          <Popup>
+            <PopupLabel label="Pickup" title={pickupName || "Loading..."} />
+          </Popup>
+        </Marker>
+      )}
 
-      {/* Drop-off Location Marker */}
-      {role === "driver" &&
-        (bookingStatus === "Goods Collected" ||
-          bookingStatus === "In Transit" ||
-          bookingStatus === "Delivered" ||
-          bookingStatus === "Pending" ||
-          bookingStatus === "Completed") &&
-        dropoffLocation && (
-          <Marker
-            position={[dropoffLocation.latitude, dropoffLocation.longitude]}
-          >
-            <Popup>Drop-off Location: {dropoffName || "Loading..."}</Popup>
-          </Marker>
-        )}
+      {showDropoffMarker && (
+        <Marker
+          position={[dropoffLocation.latitude, dropoffLocation.longitude]}
+          icon={dropoffIcon}
+        >
+          <Popup>
+            <PopupLabel label="Drop-off" title={dropoffName || "Loading..."} />
+          </Popup>
+        </Marker>
+      )}
 
-      {/* Pickup Location Marker for User */}
-      {role === "user" &&
-        (bookingStatus === "Driver Assigned" ||
-          bookingStatus === "En Route to Pickup" ||
-          bookingStatus === "Pending" ||
-          bookingStatus === "Completed") &&
-        pickupLocation && (
-          <Marker
-            position={[pickupLocation.latitude, pickupLocation.longitude]}
-          >
-            <Popup>Pickup Location</Popup>
-          </Marker>
-        )}
-
-      {/* Drop-off Location Marker for User */}
-      {role === "user" &&
-        (bookingStatus === "Goods Collected" ||
-          bookingStatus === "In Transit" ||
-          bookingStatus === "Delivered" ||
-          bookingStatus === "Pending" ||
-          bookingStatus === "Completed") &&
-        dropoffLocation && (
-          <Marker
-            position={[dropoffLocation.latitude, dropoffLocation.longitude]}
-          >
-            <Popup>Drop-off Location: {dropoffName || "Loading..."}</Popup>
-          </Marker>
-        )}
-
-      {/* Route Polyline */}
       {routeCoordinates && routeCoordinates.length > 0 && (
-        <Polyline positions={routeCoordinates} color="blue" />
+        <>
+          <Polyline
+            positions={routeCoordinates}
+            pathOptions={{
+              color: ROUTE_COLORS.outline,
+              weight: 8,
+              opacity: 0.9,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          />
+          <Polyline
+            positions={routeCoordinates}
+            pathOptions={{
+              color: ROUTE_COLORS.main,
+              weight: 4,
+              opacity: 1,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          />
+        </>
       )}
 
-      {/* Adjust map bounds only once */}
       <FitBounds bounds={bounds} />
     </MapContainer>
   );
@@ -254,6 +233,8 @@ MapView.propTypes = {
     latitude: PropTypes.number,
     longitude: PropTypes.number,
   }),
+  pickupName: PropTypes.string,
+  dropoffName: PropTypes.string,
   bookingStatus: PropTypes.string,
   routeCoordinates: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)),
 };
@@ -263,6 +244,8 @@ MapView.defaultProps = {
   driverLocation: null,
   pickupLocation: null,
   dropoffLocation: null,
+  pickupName: "",
+  dropoffName: "",
   bookingStatus: null,
   routeCoordinates: [],
 };

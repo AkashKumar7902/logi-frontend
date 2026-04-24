@@ -11,6 +11,17 @@
     <link rel="apple-touch-icon" href="/logo192.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>Logi</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('logi.theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = theme;
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

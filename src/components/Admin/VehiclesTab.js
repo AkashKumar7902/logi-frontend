@@ -1,23 +1,54 @@
-// src/components/Admin/VehiclesTab.js
-
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
-import { FaTrash, FaEdit, FaPlus } from 'react-icons/fa';
+import { FaTrash, FaInfoCircle, FaPlus } from 'react-icons/fa';
+import Button from '../shared/Button';
+import Input from '../shared/Input';
+import Select from '../shared/Select';
+import Modal from '../shared/Modal';
+import Badge from '../shared/Badge';
+import { Card, CardBody, CardHeader, CardTitle } from '../shared/Card';
+import Skeleton from '../shared/Skeleton';
+
+const emptyVehicle = {
+  make: '',
+  model: '',
+  year: '',
+  license_plate: '',
+  vehicle_type: '',
+};
+
+function DetailRow({ label, children }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-ink-100 dark:border-ink-700 last:border-b-0">
+      <span className="text-sm text-ink-500 dark:text-ink-400">{label}</span>
+      <span className="text-sm font-medium text-ink-900 dark:text-ink-50 text-right">{children}</span>
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 4, cols = 7 }) {
+  return (
+    <div className="space-y-2 p-4">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-4">
+          {Array.from({ length: cols }).map((__, c) => (
+            <Skeleton key={c} height={14} className="flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const VehiclesTab = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({
-    make: '',
-    model: '',
-    year: 0,
-    license_plate: '',
-    vehicle_type: '',
-  });
+  const [newVehicle, setNewVehicle] = useState(emptyVehicle);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchVehicles();
@@ -27,7 +58,7 @@ const VehiclesTab = () => {
   const fetchVehicles = async () => {
     try {
       const response = await api.get('/admin/vehicles');
-      setVehicles(response.data);
+      setVehicles(response.data || []);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
       toast.error('Failed to fetch vehicles.');
@@ -38,39 +69,29 @@ const VehiclesTab = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setNewVehicle({ ...newVehicle, [name]: value });
+    setNewVehicle((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddVehicle = async (e) => {
     e.preventDefault();
-
-    // Convert 'year' to a number
-    const vehicleToSubmit = {
-      ...newVehicle,
-      year: Number(newVehicle.year),
-    };
-
-    // Validate 'year'
-    if (isNaN(vehicleToSubmit.year) || vehicleToSubmit.year <= 0) {
+    const year = Number(newVehicle.year);
+    if (isNaN(year) || year <= 0) {
       toast.error('Please enter a valid year.');
       return;
     }
 
+    setSubmitting(true);
     try {
-      await api.post('/admin/vehicles', vehicleToSubmit);
+      await api.post('/admin/vehicles', { ...newVehicle, year });
       toast.success('Vehicle added successfully.');
-      setNewVehicle({
-        make: '',
-        model: '',
-        year: 0,
-        license_plate: '',
-        vehicle_type: '',
-      });
+      setNewVehicle(emptyVehicle);
       setShowAddForm(false);
       fetchVehicles();
     } catch (error) {
       console.error('Error adding vehicle:', error);
       toast.error('Failed to add vehicle.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -91,176 +112,199 @@ const VehiclesTab = () => {
     setShowDetails(true);
   };
 
-  if (loading) {
-    return <p>Loading vehicles...</p>;
-  }
-
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">Vehicles Management</h2>
-      <button
-        className="mb-4 bg-green-500 text-white px-4 py-2 rounded flex items-center"
-        onClick={() => setShowAddForm(!showAddForm)}
-      >
-        <FaPlus className="mr-2" />
-        {showAddForm ? 'Close Form' : 'Add New Vehicle'}
-      </button>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">Vehicles</h1>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            Manage the fleet and assign vehicles to drivers.
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowAddForm((v) => !v)}
+          variant={showAddForm ? 'secondary' : 'primary'}
+          leftIcon={!showAddForm && <FaPlus />}
+        >
+          {showAddForm ? 'Close' : 'Add vehicle'}
+        </Button>
+      </div>
 
-      {/* Add Vehicle Form */}
       {showAddForm && (
-        <form onSubmit={handleAddVehicle} className="mb-6 bg-white p-4 shadow rounded">
-          <h3 className="text-xl font-semibold mb-4">Add New Vehicle</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-700">Make</label>
-              <input
-                type="text"
+        <Card className="mb-6 animate-fade-in">
+          <CardHeader>
+            <CardTitle>Add new vehicle</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <form onSubmit={handleAddVehicle} className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Make"
                 name="make"
                 value={newVehicle.make}
                 onChange={handleInputChange}
                 required
-                className="w-full border p-2 rounded"
               />
-            </div>
-            <div>
-              <label className="block text-gray-700">Model</label>
-              <input
-                type="text"
+              <Input
+                label="Model"
                 name="model"
                 value={newVehicle.model}
                 onChange={handleInputChange}
                 required
-                className="w-full border p-2 rounded"
               />
-            </div>
-            <div>
-              <label className="block text-gray-700">Year</label>
-              <input
+              <Input
+                label="Year"
                 type="number"
                 name="year"
                 value={newVehicle.year}
                 onChange={handleInputChange}
                 required
-                className="w-full border p-2 rounded"
               />
-            </div>
-            <div>
-              <label className="block text-gray-700">License Plate</label>
-              <input
-                type="text"
+              <Input
+                label="License plate"
                 name="license_plate"
                 value={newVehicle.license_plate}
                 onChange={handleInputChange}
                 required
-                className="w-full border p-2 rounded"
               />
-            </div>
-            <div>
-              <label className="block text-gray-700">Vehicle Type</label>
-              <select
+              <Select
+                label="Vehicle type"
                 name="vehicle_type"
                 value={newVehicle.vehicle_type}
                 onChange={handleInputChange}
                 required
-                className="w-full border p-2 rounded"
+                containerClassName="sm:col-span-2"
               >
-                <option value="">Select Type</option>
+                <option value="">Select type</option>
                 <option value="bike">Bike</option>
                 <option value="car">Car</option>
                 <option value="van">Van</option>
-              </select>
+              </Select>
+              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowAddForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" loading={submitting}>
+                  Add vehicle
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All vehicles</CardTitle>
+          <span className="text-sm text-ink-500 dark:text-ink-400">
+            {loading ? '—' : `${vehicles.length} total`}
+          </span>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <TableSkeleton rows={5} cols={7} />
+          ) : vehicles.length === 0 ? (
+            <div className="text-center py-12 px-4">
+              <p className="text-sm text-ink-500 dark:text-ink-400">No vehicles yet.</p>
+              <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+                Add your first vehicle to get started.
+              </p>
             </div>
-          </div>
-          <button type="submit" className="mt-4 bg-blue-500 text-white px-4 py-2 rounded">
-            Add Vehicle
-          </button>
-        </form>
-      )}
-
-      {/* Vehicles List */}
-      <table className="w-full bg-white shadow rounded">
-        <thead>
-          <tr>
-            <th className="py-2 px-4 border-b">Make</th>
-            <th className="py-2 px-4 border-b">Model</th>
-            <th className="py-2 px-4 border-b">Year</th>
-            <th className="py-2 px-4 border-b">License Plate</th>
-            <th className="py-2 px-4 border-b">Vehicle Type</th>
-            <th className="py-2 px-4 border-b">Driver ID</th>
-            <th className="py-2 px-4 border-b">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {!vehicles ? (
-            <tr>
-              <td colSpan="7" className="text-center py-4">
-                No vehicles found.
-              </td>
-            </tr>
           ) : (
-            vehicles.map((vehicle) => (
-              <tr key={vehicle.id}>
-                <td className="py-2 px-4 border-b">{vehicle.make}</td>
-                <td className="py-2 px-4 border-b">{vehicle.model}</td>
-                <td className="py-2 px-4 border-b">{vehicle.year}</td>
-                <td className="py-2 px-4 border-b">{vehicle.license_plate}</td>
-                <td className="py-2 px-4 border-b">{vehicle.vehicle_type}</td>
-                <td className="py-2 px-4 border-b">
-                  {vehicle.driver_id ? vehicle.driver_id : 'Unassigned'}
-                </td>
-                <td className="py-2 px-4 border-b flex space-x-2">
-                  <button
-                    className="text-blue-500 hover:text-blue-700"
-                    onClick={() => handleViewDetails(vehicle)}
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    className="text-red-500 hover:text-red-700"
-                    onClick={() => handleDeleteVehicle(vehicle.id)}
-                  >
-                    <FaTrash />
-                  </button>
-                </td>
-              </tr>
-            ))
+            <table className="w-full text-sm">
+              <thead className="bg-ink-50 dark:bg-ink-900/50 text-ink-500 dark:text-ink-400 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="text-left font-medium py-3 px-4">Make</th>
+                  <th className="text-left font-medium py-3 px-4">Model</th>
+                  <th className="text-left font-medium py-3 px-4">Year</th>
+                  <th className="text-left font-medium py-3 px-4">License</th>
+                  <th className="text-left font-medium py-3 px-4">Type</th>
+                  <th className="text-left font-medium py-3 px-4">Driver</th>
+                  <th className="text-right font-medium py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100 dark:divide-ink-700">
+                {vehicles.map((v) => (
+                  <tr key={v.id} className="hover:bg-ink-50/50 dark:hover:bg-ink-900/40 transition-colors">
+                    <td className="py-3 px-4 font-medium text-ink-900 dark:text-ink-50">{v.make}</td>
+                    <td className="py-3 px-4 text-ink-700 dark:text-ink-200">{v.model}</td>
+                    <td className="py-3 px-4 text-ink-700 dark:text-ink-200 tabular-nums">{v.year}</td>
+                    <td className="py-3 px-4 text-ink-700 dark:text-ink-200 font-mono text-xs">
+                      {v.license_plate}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge tone="brand">{v.vehicle_type}</Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      {v.driver_id ? (
+                        <span className="text-ink-700 dark:text-ink-200">{v.driver_id}</span>
+                      ) : (
+                        <Badge tone="neutral">Unassigned</Badge>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(v)}
+                          aria-label="View details"
+                        >
+                          <FaInfoCircle />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteVehicle(v.id)}
+                          aria-label="Delete vehicle"
+                          className="text-danger-600 hover:bg-danger-50 dark:text-danger-500 dark:hover:bg-danger-500/15"
+                        >
+                          <FaTrash />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </tbody>
-      </table>
-
-      {/* Vehicle Details Modal */}
-      {showDetails && selectedVehicle && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded shadow-lg w-1/3">
-            <h3 className="text-xl font-semibold mb-4">Vehicle Details</h3>
-            <p>
-              <strong>Make:</strong> {selectedVehicle.make}
-            </p>
-            <p>
-              <strong>Model:</strong> {selectedVehicle.model}
-            </p>
-            <p>
-              <strong>Year:</strong> {selectedVehicle.year}
-            </p>
-            <p>
-              <strong>License Plate:</strong> {selectedVehicle.license_plate}
-            </p>
-            <p>
-              <strong>Vehicle Type:</strong> {selectedVehicle.vehicle_type}
-            </p>
-            <p>
-              <strong>Driver ID:</strong>{' '}
-              {selectedVehicle.driver_id ? selectedVehicle.driver_id : 'Unassigned'}
-            </p>
-            <button
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
-              onClick={() => setShowDetails(false)}
-            >
-              Close
-            </button>
-          </div>
         </div>
-      )}
+      </Card>
+
+      <Modal
+        open={showDetails && !!selectedVehicle}
+        onClose={() => setShowDetails(false)}
+        title="Vehicle details"
+        footer={
+          <Button variant="secondary" onClick={() => setShowDetails(false)}>
+            Close
+          </Button>
+        }
+      >
+        {selectedVehicle && (
+          <div>
+            <DetailRow label="Make">{selectedVehicle.make}</DetailRow>
+            <DetailRow label="Model">{selectedVehicle.model}</DetailRow>
+            <DetailRow label="Year">{selectedVehicle.year}</DetailRow>
+            <DetailRow label="License plate">
+              <span className="font-mono text-xs">{selectedVehicle.license_plate}</span>
+            </DetailRow>
+            <DetailRow label="Vehicle type">
+              <Badge tone="brand">{selectedVehicle.vehicle_type}</Badge>
+            </DetailRow>
+            <DetailRow label="Driver">
+              {selectedVehicle.driver_id ? (
+                selectedVehicle.driver_id
+              ) : (
+                <Badge tone="neutral">Unassigned</Badge>
+              )}
+            </DetailRow>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

@@ -1,29 +1,26 @@
-// src/components/Shared/AvailabilitySwitch.js
-
-import React from 'react';
-import Switch from 'react-switch';
-import PropTypes from 'prop-types';
+import React from "react";
+import PropTypes from "prop-types";
+import Toggle from "./Toggle";
 
 const AvailabilitySwitch = ({ isOnline, handleToggle }) => {
   return (
-    <div className="flex items-center mb-4">
-      <span className="mr-2 text-gray-700">Offline</span>
-      <Switch
-        onChange={handleToggle}
-        checked={isOnline}
-        onColor="#86d3ff"
-        onHandleColor="#2693e6"
-        handleDiameter={30}
-        uncheckedIcon={false}
-        checkedIcon={false}
-        boxShadow="0px 1px 5px rgba(0, 0, 0, 0.6)"
-        activeBoxShadow="0px 0px 1px 10px rgba(0, 0, 0, 0.2)"
-        height={20}
-        width={48}
-        className="react-switch"
-        id="material-switch"
-      />
-      <span className="ml-2 text-gray-700">Online</span>
+    <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-white dark:bg-ink-800 border border-ink-100 dark:border-ink-700">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span
+          className={`h-2 w-2 rounded-full shrink-0 ${
+            isOnline ? "bg-success-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]" : "bg-ink-300 dark:bg-ink-600"
+          }`}
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+            {isOnline ? "You're online" : "You're offline"}
+          </p>
+          <p className="text-xs text-ink-500 dark:text-ink-400 truncate">
+            {isOnline ? "Receiving booking requests" : "Go online to accept jobs"}
+          </p>
+        </div>
+      </div>
+      <Toggle checked={isOnline} onChange={handleToggle} aria-label="Toggle availability" />
     </div>
   );
 };
