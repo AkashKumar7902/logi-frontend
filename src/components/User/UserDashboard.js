@@ -2,7 +2,18 @@ import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FaBoxOpen, FaMapMarkerAlt, FaUser, FaEnvelope, FaCar, FaRupeeSign, FaTimes } from "react-icons/fa";
+import {
+  FaBoxOpen,
+  FaMapMarkerAlt,
+  FaUser,
+  FaEnvelope,
+  FaCar,
+  FaRupeeSign,
+  FaTimes,
+  FaMotorcycle,
+  FaTruck,
+  FaCheck,
+} from "react-icons/fa";
 
 import api from "../../services/api";
 import MapView from "../Map/MapView";
@@ -13,10 +24,30 @@ import geocodingService from "../../services/geoCodingService";
 import { fromGeoJSONPoint, toGeoJSONPoint } from "../../services/location";
 
 import Button from "../shared/Button";
-import Select from "../shared/Select";
 import Badge from "../shared/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "../shared/Card";
 import Skeleton from "../shared/Skeleton";
+
+const VEHICLE_OPTIONS = [
+  {
+    value: "bike",
+    label: "Bike",
+    icon: FaMotorcycle,
+    description: "Small parcels · Fastest",
+  },
+  {
+    value: "car",
+    label: "Car",
+    icon: FaCar,
+    description: "Up to 4 bags",
+  },
+  {
+    value: "van",
+    label: "Van",
+    icon: FaTruck,
+    description: "Bulk items · Largest",
+  },
+];
 
 const STATUS_META = {
   Pending: { tone: "warning", label: "Searching for driver" },
@@ -46,6 +77,76 @@ function DetailLine({ icon: Icon, label, children }) {
   );
 }
 
+function VehicleOption({
+  icon: Icon,
+  label,
+  description,
+  price,
+  loading,
+  selected,
+  disabled,
+  onSelect,
+}) {
+  const clickable = !disabled && price != null;
+  return (
+    <button
+      type="button"
+      onClick={clickable ? onSelect : undefined}
+      disabled={!clickable}
+      aria-pressed={selected}
+      className={[
+        "group w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
+        selected
+          ? "border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10 dark:border-brand-400"
+          : "border-ink-200 bg-white hover:border-ink-300 dark:bg-ink-800 dark:border-ink-700 dark:hover:border-ink-600",
+        !clickable && "opacity-60 cursor-not-allowed",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div
+        className={[
+          "h-10 w-10 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+          selected
+            ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300"
+            : "bg-ink-100 text-ink-600 dark:bg-ink-700 dark:text-ink-300",
+        ].join(" ")}
+      >
+        <Icon size={18} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
+            {label}
+          </p>
+          {selected && (
+            <FaCheck
+              className="text-brand-600 dark:text-brand-300 text-xs"
+              aria-hidden="true"
+            />
+          )}
+        </div>
+        <p className="text-xs text-ink-500 dark:text-ink-400 truncate">
+          {description}
+        </p>
+      </div>
+      <div className="shrink-0 text-right min-w-[56px]">
+        {loading ? (
+          <Skeleton height={14} className="w-12 ml-auto" />
+        ) : price != null ? (
+          <span className="text-sm font-semibold text-ink-900 dark:text-ink-50 tabular-nums">
+            ₹{price}
+          </span>
+        ) : (
+          <span className="text-xs text-ink-400 dark:text-ink-500">
+            Unavailable
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 const UserDashboard = () => {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.websocket.messages);
@@ -59,10 +160,9 @@ const UserDashboard = () => {
     vehicleType: "car",
     scheduledTime: "",
   });
-  const [priceEstimate, setPriceEstimate] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [estimates, setEstimates] = useState({});
+  const [loadingEstimates, setLoadingEstimates] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [estimating, setEstimating] = useState(false);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState(null);
   const [pickup, setPickup] = useState(null);
@@ -201,6 +301,42 @@ const UserDashboard = () => {
     );
   };
 
+  useEffect(() => {
+    if (!pickup || !dropoff || activeBooking) {
+      setEstimates({});
+      setLoadingEstimates(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingEstimates(true);
+
+    const types = VEHICLE_OPTIONS.map((v) => v.value);
+    const payload = {
+      pickup_location: toGeoJSONPoint(pickup),
+      dropoff_location: toGeoJSONPoint(dropoff),
+    };
+
+    Promise.allSettled(
+      types.map((t) =>
+        api.post("/bookings/estimate", { ...payload, vehicle_type: t }),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const next = {};
+      results.forEach((r, i) => {
+        next[types[i]] =
+          r.status === "fulfilled" ? r.value.data?.estimated_price ?? null : null;
+      });
+      setEstimates(next);
+      setLoadingEstimates(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pickup, dropoff, activeBooking]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -214,7 +350,6 @@ const UserDashboard = () => {
       return;
     }
     setBooking(true);
-    setLoading(true);
     setError(null);
     try {
       const response = await api.post("/bookings", {
@@ -236,34 +371,6 @@ const UserDashboard = () => {
       toast.error(err?.response?.data?.error);
     } finally {
       setBooking(false);
-      setLoading(false);
-    }
-  };
-
-  const handlePriceEstimate = async () => {
-    if (!pickup || !dropoff) {
-      setError("Please select both pickup and drop-off locations.");
-      toast.error("Please select both pickup and drop-off locations.");
-      return;
-    }
-    setEstimating(true);
-    setError(null);
-    try {
-      const response = await api.post("/bookings/estimate", {
-        pickup_location: toGeoJSONPoint(pickup),
-        dropoff_location: toGeoJSONPoint(dropoff),
-        vehicle_type: formData.vehicleType,
-      });
-      if (response.data) {
-        setPriceEstimate(response.data.estimated_price);
-        toast.info(`Price estimate: ₹${response.data.estimated_price}`);
-      }
-    } catch (err) {
-      console.error("Error getting price estimate:", err);
-      setError(err?.response?.data?.error);
-      toast.error(err?.response?.data?.error);
-    } finally {
-      setEstimating(false);
     }
   };
 
@@ -401,24 +508,15 @@ const UserDashboard = () => {
             <AutocompleteSearch label="Pickup" onSelect={handlePickupSelect} />
             <AutocompleteSearch label="Drop-off" onSelect={handleDropoffSelect} />
 
-            <Select
-              label="Vehicle type"
-              name="vehicleType"
-              value={formData.vehicleType}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="bike">Bike</option>
-              <option value="car">Car</option>
-              <option value="van">Van</option>
-            </Select>
-
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="scheduledTime"
                 className="text-sm font-medium text-ink-700 dark:text-ink-200"
               >
-                Scheduled time <span className="text-ink-400 dark:text-ink-500 font-normal">(optional)</span>
+                Scheduled time{" "}
+                <span className="text-ink-400 dark:text-ink-500 font-normal">
+                  (optional)
+                </span>
               </label>
               <input
                 id="scheduledTime"
@@ -430,29 +528,71 @@ const UserDashboard = () => {
               />
             </div>
 
-            {priceEstimate !== null && (
-              <div className="rounded-lg bg-success-50 border border-success-500/30 px-3 py-2.5 flex items-center justify-between dark:bg-success-500/10">
-                <span className="text-sm text-success-700 dark:text-success-500">Estimated fare</span>
-                <span className="text-lg font-semibold text-success-700 dark:text-success-500">
-                  ₹{priceEstimate}
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 pt-1">
-              <Button type="submit" fullWidth loading={booking}>
-                {booking ? "Booking..." : "Book now"}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                fullWidth
-                onClick={handlePriceEstimate}
-                loading={estimating}
-              >
-                {estimating ? "Calculating..." : "Get price estimate"}
-              </Button>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm font-medium text-ink-700 dark:text-ink-200">
+                Choose a vehicle
+              </p>
+              {!pickup || !dropoff ? (
+                <p className="text-xs text-ink-500 dark:text-ink-400">
+                  Select pickup and drop-off to see prices.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {VEHICLE_OPTIONS.map((opt) => {
+                    const price = estimates[opt.value];
+                    return (
+                      <VehicleOption
+                        key={opt.value}
+                        icon={opt.icon}
+                        label={opt.label}
+                        description={opt.description}
+                        price={price}
+                        loading={loadingEstimates}
+                        selected={formData.vehicleType === opt.value}
+                        onSelect={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            vehicleType: opt.value,
+                          }))
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            {(() => {
+              const selectedOpt = VEHICLE_OPTIONS.find(
+                (o) => o.value === formData.vehicleType,
+              );
+              const selectedPrice = estimates[formData.vehicleType];
+              const canBook =
+                !!pickup &&
+                !!dropoff &&
+                !loadingEstimates &&
+                selectedPrice != null;
+              const label = booking
+                ? "Booking..."
+                : canBook
+                  ? `Book ${selectedOpt?.label} · ₹${selectedPrice}`
+                  : !pickup || !dropoff
+                    ? "Set pickup and drop-off"
+                    : loadingEstimates
+                      ? "Fetching prices..."
+                      : "Unavailable";
+              return (
+                <Button
+                  type="submit"
+                  fullWidth
+                  size="lg"
+                  loading={booking}
+                  disabled={!canBook || booking}
+                >
+                  {label}
+                </Button>
+              );
+            })()}
           </form>
         </div>
       );
