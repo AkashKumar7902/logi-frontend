@@ -100,7 +100,8 @@ const DriverDashboard = () => {
       }
       if (
         bookingDetails.status === "In Transit" ||
-        bookingDetails.status === "Goods Collected"
+        bookingDetails.status === "Goods Collected" ||
+        bookingDetails.status === "Delivered"
       ) {
         fetchRoute(driverLocation, dropoffLocation);
       }

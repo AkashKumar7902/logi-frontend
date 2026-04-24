@@ -88,7 +88,8 @@ const UserDashboard = () => {
           fetchRoute(driverLocation, pickupLocation);
         } else if (
           activeBooking.status === "In Transit" ||
-          activeBooking.status === "Goods Collected"
+          activeBooking.status === "Goods Collected" ||
+          activeBooking.status === "Delivered"
         ) {
           fetchRoute(driverLocation, dropoffLocation);
         }

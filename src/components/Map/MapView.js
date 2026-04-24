@@ -185,6 +185,7 @@ const MapView = ({
       {role === "driver" &&
         (bookingStatus === "Goods Collected" ||
           bookingStatus === "In Transit" ||
+          bookingStatus === "Delivered" ||
           bookingStatus === "Pending" ||
           bookingStatus === "Completed") &&
         dropoffLocation && (
@@ -213,6 +214,7 @@ const MapView = ({
       {role === "user" &&
         (bookingStatus === "Goods Collected" ||
           bookingStatus === "In Transit" ||
+          bookingStatus === "Delivered" ||
           bookingStatus === "Pending" ||
           bookingStatus === "Completed") &&
         dropoffLocation && (
